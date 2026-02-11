@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.orbita'
-version = '0.0.1-SNAPSHOT'
+version = '0.0.2'
 description = '우주공부선 백엔드 서버입니다.'
 
 java {
