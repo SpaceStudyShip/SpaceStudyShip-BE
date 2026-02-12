@@ -10,4 +10,12 @@ jar {
 dependencies {
 	api project(':SS-Common')
 	api project(':SS-Member')
+
+	// JWT (최신 버전)
+	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+	runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+	runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+	// Redis (Refresh Token 저장)
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 }

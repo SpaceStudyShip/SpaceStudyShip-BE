@@ -1,0 +1,51 @@
+spring:
+  # PostgreSQL
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: false
+
+  # Redis
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+
+    # MongoDB
+    mongodb:
+      uri: ${MONGO_URI}
+
+# JWT
+jwt:
+  access:
+    secret: ${ACCESS_SECRET_KEY}
+    expiration: ${ACCESS_EXPIRATION}
+  refresh:
+    secret: ${REFRESH_SECRET_KEY}
+    expiration: ${REFRESH_EXPIRATION}
+
+# Swagger (prod에서는 비활성화)
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never

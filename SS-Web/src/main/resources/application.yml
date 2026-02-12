@@ -1,3 +1,6 @@
 spring:
   application:
     name: space-study-ship
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}

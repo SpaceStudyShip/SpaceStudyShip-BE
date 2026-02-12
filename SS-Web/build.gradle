@@ -8,7 +8,17 @@ dependencies {
 	api project(':SS-Auth')
 	api project(':SS-Member')
 	api project(':SS-Study')
+	api project(':SS-Application')
 
-	runtimeOnly 'com.mysql:mysql-connector-j'
+	// Swagger
+	implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.7.0'
+
+	// Actuator
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+	// Database
+	runtimeOnly 'org.postgresql:postgresql'
+
+	// Docker Compose
 	developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
 }

@@ -1,0 +1,52 @@
+spring:
+  # PostgreSQL
+  datasource:
+    url: jdbc:postgresql://localhost:5432/spacestudyship
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: true
+
+  # Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+    # MongoDB
+    mongodb:
+      uri: mongodb://localhost:27017/spacestudyship
+
+# JWT
+jwt:
+  access:
+    secret: ${ACCESS_SECRET_KEY}
+    expiration: ${ACCESS_EXPIRATION}
+  refresh:
+    secret: ${REFRESH_SECRET_KEY}
+    expiration: ${REFRESH_EXPIRATION}
+
+# Swagger
+springdoc:
+  swagger-ui:
+    path: /docs/swagger
+    display-request-duration: true
+    persist-authorization: true
+    filter: true
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always
