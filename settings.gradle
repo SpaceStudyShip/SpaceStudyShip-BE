@@ -5,3 +5,9 @@ pluginManagement {
 	}
 }
 rootProject.name = 'space-study-ship'
+
+include 'SS-Common'
+include 'SS-Auth'
+include 'SS-Member'
+include 'SS-Study'
+include 'SS-Web'

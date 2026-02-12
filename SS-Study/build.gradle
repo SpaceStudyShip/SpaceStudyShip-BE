@@ -1,0 +1,13 @@
+bootJar {
+	enabled = false
+}
+
+jar {
+	enabled = true
+	archiveClassifier = ''
+}
+
+dependencies {
+	api project(':SS-Common')
+	api project(':SS-Member')
+}

@@ -1,0 +1,14 @@
+bootJar {
+	enabled = true
+	archiveFileName = 'app.jar'
+}
+
+dependencies {
+	api project(':SS-Common')
+	api project(':SS-Auth')
+	api project(':SS-Member')
+	api project(':SS-Study')
+
+	runtimeOnly 'com.mysql:mysql-connector-j'
+	developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
+}
