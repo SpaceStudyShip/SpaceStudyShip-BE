@@ -5,7 +5,7 @@ plugins {
 }
 
 group = 'com.elipair'
-version = '0.0.3'
+version = '0.0.4'
 description = '우주공부선 백엔드 서버입니다.'
 
 bootJar {
