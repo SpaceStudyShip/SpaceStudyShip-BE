@@ -1,5 +1,9 @@
 # SpaceStudyShip-BE 코드 컨벤션
 
+## ⚠️ Claude 행동 규칙
+
+- **커밋은 절대 임의로 하지 않는다. 반드시 사용자가 명시적으로 요청할 때만 커밋한다.**
+
 ## 프로젝트 기본 정보
 - **그룹 ID**: com.elipair
 - **패키지**: com.elipair.spacestudyship
