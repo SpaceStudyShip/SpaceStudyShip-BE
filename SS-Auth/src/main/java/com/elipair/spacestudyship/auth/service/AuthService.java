@@ -90,17 +90,26 @@ public class AuthService {
     /**
      * Access Token 재발급
      */
-    @Transactional(readOnly = true)
-    public Tokens reissueTokens(String refreshToken) {
+    @Transactional
+    public ReissueResponse reissue(ReissueRequest request) {
+        String refreshToken = request.refreshToken();
         Long memberId = jwtTokenProvider.getMemberIdFromRefreshToken(refreshToken);
+        String storedRefreshToken = refreshTokenRepository.findByMemberId(memberId).orElse(null);
 
-        String storedRefreshToken = refreshTokenRepository.findByMemberId(memberId);
-        if (!refreshToken.equals(storedRefreshToken)) {
+        if (storedRefreshToken == null) {
+            log.warn("[Security] Refresh Token 재사용 감지 - 잠재적 탈취 | memberId={}", memberId);
             throw new CustomException(ErrorCode.INVALID_TOKEN);
         }
 
+        if (!refreshToken.equals(storedRefreshToken)) {
+            refreshTokenRepository.delete(memberId);
+            log.warn("[Security] Refresh Token 불일치 - 강제 로그아웃 처리 | memberId={}", memberId);
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
+
+        refreshTokenRepository.delete(memberId);
         Member member = memberRepository.getByMemberId(memberId);
-        return issueTokens(member);
+        return new ReissueResponse(issueTokens(member));
     }
 
     /**

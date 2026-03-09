@@ -5,7 +5,6 @@ import com.elipair.spacestudyship.auth.dto.LoginResponse;
 import com.elipair.spacestudyship.auth.dto.LogoutRequest;
 import com.elipair.spacestudyship.auth.dto.ReissueRequest;
 import com.elipair.spacestudyship.auth.dto.ReissueResponse;
-import com.elipair.spacestudyship.auth.dto.Tokens;
 import com.elipair.spacestudyship.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -36,8 +35,7 @@ public class AuthController {
     @Operation(summary = "토큰 재발급")
     @PostMapping("/reissue")
     public ResponseEntity<ReissueResponse> reissue(@RequestBody @Valid ReissueRequest request) {
-        Tokens tokens = authService.reissueTokens(request.refreshToken());
-        return ResponseEntity.ok(new ReissueResponse(tokens));
+        return ResponseEntity.ok(authService.reissue(request));
     }
 
     @Operation(summary = "로그아웃")
