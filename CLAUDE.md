@@ -38,6 +38,7 @@ SS-Web/controller/{도메인}/XxxController.java
 ### 도메인 모듈 (SS-Auth, SS-Member 등)
 ```
 {모듈}/
+├── constant/     ← Enum, 상수 클래스
 ├── dto/          ← 해당 모듈의 모든 DTO (Controller/Service 공유)
 ├── entity/       ← JPA Entity
 ├── repository/
@@ -45,6 +46,7 @@ SS-Web/controller/{도메인}/XxxController.java
 └── {관심사}/     ← jwt/, social/, interceptor/ 등
 ```
 
+- `constant/` 폴더: Enum 등 상수성 클래스는 반드시 여기 위치 (entity/ 금지)
 - `filter/` 폴더는 실제 Filter 클래스가 생길 때 추가한다.
 
 ---
@@ -66,9 +68,14 @@ public record LoginResponse(String accessToken, String refreshToken, boolean isN
 ### 네이밍
 | 용도 | 규칙 | 예시 |
 |------|------|------|
-| 입력 DTO | `{메소드명}Request` | `LoginRequest` |
-| 출력 DTO | `{메소드명}Response` | `LoginResponse` |
-| 공유 DTO | `{의미단위}Dto` | `MemberDto` |
+| Controller 입력 | `{메소드명}Request` | `LoginRequest` |
+| Controller 출력 | `{메소드명}Response` | `LoginResponse` |
+| 내부 공유 / 값 객체 | `{의미단위}Dto` | `AuthMemberDto`, `MemberDto` |
+
+### DTO 위치 규칙
+- **모든 DTO는 반드시 해당 모듈의 `dto/` 폴더에 위치**
+- Controller/Service 공유 DTO, Service 내부 전용 DTO 모두 `dto/`에 위치
+- Service 내부에 private inner record로 DTO를 정의하지 않음
 
 ### Controller ↔ Service DTO 공유
 Controller와 Service는 **같은 DTO를 직접 사용**한다. Command/Result 중간 변환 없음.

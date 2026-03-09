@@ -1,6 +1,6 @@
 package com.elipair.spacestudyship.auth.social;
 
-import com.elipair.spacestudyship.member.entity.SocialType;
+import com.elipair.spacestudyship.member.constant.SocialType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 

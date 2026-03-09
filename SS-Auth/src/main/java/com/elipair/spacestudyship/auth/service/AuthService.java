@@ -7,7 +7,7 @@ import com.elipair.spacestudyship.auth.social.SocialLoginStrategy;
 import com.elipair.spacestudyship.common.exception.CustomException;
 import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.member.entity.Member;
-import com.elipair.spacestudyship.member.entity.SocialType;
+import com.elipair.spacestudyship.member.constant.SocialType;
 import com.elipair.spacestudyship.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,7 +37,7 @@ public class AuthService {
     @Transactional
     public LoginResponse login(LoginRequest request) {
         String socialId = getSocialId(request.socialType(), request.idToken());
-        AuthMemberData authMemberData = findOrRegisterMember(socialId, request.socialType());
+        AuthMemberDto authMemberData = findOrRegisterMember(socialId, request.socialType());
         Member member = authMemberData.member;
         Tokens tokens = issueTokens(member);
         return new LoginResponse(member.getId(), member.getNickname(), tokens, authMemberData.isNewMember);
@@ -51,9 +51,9 @@ public class AuthService {
         return strategy.validateAndGetSocialId(idToken);
     }
 
-    private AuthMemberData findOrRegisterMember(String socialId, SocialType socialType) {
+    private AuthMemberDto findOrRegisterMember(String socialId, SocialType socialType) {
         return memberRepository.findBySocialIdAndSocialType(socialId, socialType)
-                .map(member -> new AuthMemberData(member, false))
+                .map(member -> new AuthMemberDto(member, false))
                 .orElseGet(() -> {
                     String nickname = generateUniqueNickname();
                     Member newMember = Member.signUp(socialId, socialType, nickname);
@@ -61,7 +61,7 @@ public class AuthService {
 
                     log.info("[SignUp] 신규 회원가입 성공 | memberId={}, nickname={}, socialType={}",
                             newMember.getId(), nickname, socialType);
-                    return new AuthMemberData(newMember, true);
+                    return new AuthMemberDto(newMember, true);
                 });
     }
 
@@ -121,9 +121,4 @@ public class AuthService {
                 .ifPresent(refreshTokenRepository::delete);
     }
 
-    private record AuthMemberData(
-            Member member,
-            boolean isNewMember
-    ) {
-    }
 }

@@ -1,6 +1,6 @@
 package com.elipair.spacestudyship.auth.dto;
 
-import com.elipair.spacestudyship.member.entity.SocialType;
+import com.elipair.spacestudyship.member.constant.SocialType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 

@@ -3,7 +3,7 @@ package com.elipair.spacestudyship.member.repository;
 import com.elipair.spacestudyship.common.exception.CustomException;
 import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.member.entity.Member;
-import com.elipair.spacestudyship.member.entity.SocialType;
+import com.elipair.spacestudyship.member.constant.SocialType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
