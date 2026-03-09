@@ -1,10 +1,8 @@
 package com.elipair.spacestudyship.auth.service;
 
-import com.elipair.spacestudyship.auth.domain.Tokens;
+import com.elipair.spacestudyship.auth.dto.*;
 import com.elipair.spacestudyship.auth.jwt.JwtTokenProvider;
 import com.elipair.spacestudyship.auth.repository.RefreshTokenRepository;
-import com.elipair.spacestudyship.auth.service.dto.LoginCommand;
-import com.elipair.spacestudyship.auth.service.dto.LoginResult;
 import com.elipair.spacestudyship.auth.social.SocialLoginStrategy;
 import com.elipair.spacestudyship.common.exception.CustomException;
 import com.elipair.spacestudyship.common.exception.ErrorCode;
@@ -37,13 +35,12 @@ public class AuthService {
      * - 기존 회원: 토큰만 재발급
      */
     @Transactional
-    public LoginResult login(LoginCommand command) {
-        String socialId = getSocialId(command.socialType(), command.idToken());
-        AuthMemberData authMemberData = findOrRegisterMember(socialId, command.socialType());
+    public LoginResponse login(LoginRequest request) {
+        String socialId = getSocialId(request.socialType(), request.idToken());
+        AuthMemberData authMemberData = findOrRegisterMember(socialId, request.socialType());
         Member member = authMemberData.member;
         Tokens tokens = issueTokens(member);
-
-        return LoginResult.of(member, authMemberData.isNewMember, tokens);
+        return new LoginResponse(member.getId(), member.getNickname(), tokens, authMemberData.isNewMember);
     }
 
     private String getSocialId(SocialType socialType, String idToken) {
