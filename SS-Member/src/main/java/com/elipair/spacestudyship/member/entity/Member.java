@@ -1,6 +1,6 @@
 package com.elipair.spacestudyship.member.entity;
 
-import com.elipair.spacestudyship.common.BaseTimeEntity;
+import com.elipair.spacestudyship.common.entity.BaseTimeEntity;
 import jakarta.persistence.*;
 import lombok.*;
 
