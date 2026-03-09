@@ -37,3 +37,8 @@ out/
 .vscode/
 
 *.properties
+
+### Claude Generated ###
+docs/plans/
+issue/
+report/
