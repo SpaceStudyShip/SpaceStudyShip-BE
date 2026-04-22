@@ -37,3 +37,8 @@ out/
 .vscode/
 
 *.properties
+
+### Spring 환경별 설정 파일 (민감 정보 포함) ###
+application-dev.yml
+application-prod.yml
+application-local.yml
