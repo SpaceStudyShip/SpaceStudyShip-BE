@@ -1,0 +1,33 @@
+{
+  "metadata": {
+    "lastUpdated": "2026-04-22T09:17:26Z",
+    "currentVersion": "0.0.10",
+    "projectType": "spring",
+    "totalReleases": 1
+  },
+  "releases": [
+    {
+      "version": "0.0.10",
+      "project_type": "spring",
+      "date": "2026-04-22",
+      "pr_number": 6,
+      "raw_summary": "## Summary by CodeRabbit\n\n## 릴리스 노트\n\n* **개선**\n  * CICD 자동 배포 파이프라인 운영 환경 설정 완료\n  * deploy 브랜치 생성으로 자동 배포 트리거 구성\n\n* **기타**\n  * 이슈 작업 완료 리포트 문서 업데이트",
+      "parsed_changes": {
+        "개선": {
+          "title": "개선",
+          "items": [
+            "CICD 자동 배포 파이프라인 운영 환경 설정 완료",
+            "deploy 브랜치 생성으로 자동 배포 트리거 구성"
+          ]
+        },
+        "기타": {
+          "title": "기타",
+          "items": [
+            "이슈 작업 완료 리포트 문서 업데이트"
+          ]
+        }
+      },
+      "parse_method": "markdown"
+    }
+  ]
+}
