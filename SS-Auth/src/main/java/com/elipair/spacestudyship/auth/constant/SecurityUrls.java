@@ -19,12 +19,13 @@ public class SecurityUrls {
         // 인증 API
         "/api/auth/**",
 
-        // Swagger UI (springdoc 내부 리소스 포함)
+        // Swagger UI (springdoc path 커스텀 시 /docs/swagger-ui/** 경로로 리다이렉트됨)
         "/docs/swagger",
         "/docs/swagger/**",
+        "/docs/swagger-ui/**",
         "/docs/api-docs",
         "/docs/api-docs/**",
-        "/swagger-ui.html",         // springdoc 기본 리다이렉트 경로
+        "/swagger-ui.html",
         "/swagger-ui/**",
         "/v3/api-docs/**",
         "/webjars/**",
