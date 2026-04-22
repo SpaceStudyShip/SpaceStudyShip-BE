@@ -32,7 +32,7 @@ public class SwaggerConfig {
         return new OpenAPI()
                 .info(info)
                 .servers(List.of(
-                        new Server().url("http://suh-project.synology.me:8096").description("Production"),
+                        new Server().url("http://suh-project.synology.me:8099").description("Production"),
                         new Server().url("http://localhost:8080").description("Local")
                 ))
                 .addSecurityItem(securityRequirement)
