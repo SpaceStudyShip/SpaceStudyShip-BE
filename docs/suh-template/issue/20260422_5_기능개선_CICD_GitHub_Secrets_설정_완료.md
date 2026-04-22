@@ -6,7 +6,7 @@ type: project
 
 # 🚀[기능개선][DevOps] CICD GitHub Secrets 설정 및 워크플로우 검증
 
-- 라벨: 작업전
+- 라벨: 작업완료
 - 담당자: Cassiiopeia
 
 📝 현재 문제점
