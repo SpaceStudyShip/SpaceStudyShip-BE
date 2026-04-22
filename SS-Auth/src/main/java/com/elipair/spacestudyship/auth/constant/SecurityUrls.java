@@ -24,8 +24,10 @@ public class SecurityUrls {
         "/docs/swagger/**",
         "/docs/api-docs",
         "/docs/api-docs/**",
+        "/swagger-ui.html",         // springdoc 기본 리다이렉트 경로
         "/swagger-ui/**",
         "/v3/api-docs/**",
-        "/webjars/**"
+        "/webjars/**",
+        "/favicon.ico"
     );
 }
