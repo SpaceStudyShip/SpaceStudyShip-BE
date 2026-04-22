@@ -42,3 +42,6 @@ out/
 application-dev.yml
 application-prod.yml
 application-local.yml
+
+### Claude Config (PAT 포함 민감 정보) ###
+.claude/config.json
