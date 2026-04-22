@@ -35,8 +35,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/auth/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
-                // Swagger UI 외부 접근 허용
-                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/docs/swagger/**", "/docs/api-docs/**").permitAll()
+                // Swagger UI 외부 접근 허용 (경로 자체 + 내부 리소스 전체)
+                .requestMatchers("/docs/swagger", "/docs/swagger/**", "/docs/api-docs", "/docs/api-docs/**", "/swagger-ui/**", "/v3/api-docs/**", "/webjars/**").permitAll()
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex
