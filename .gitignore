@@ -42,3 +42,8 @@ out/
 application-dev.yml
 application-prod.yml
 application-local.yml
+
+### Claude Generated ###
+docs/plans/
+issue/
+report/

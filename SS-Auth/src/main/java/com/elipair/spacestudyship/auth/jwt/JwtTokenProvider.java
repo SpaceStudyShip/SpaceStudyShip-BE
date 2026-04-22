@@ -24,8 +24,18 @@ public class JwtTokenProvider {
 
     public JwtTokenProvider(JwtProperties jwtProperties) {
         this.jwtProperties = jwtProperties;
-        this.accessKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtProperties.access().secret()));
-        this.refreshKey = Keys.hmacShaKeyFor(Decoders.BASE64.decode(jwtProperties.refresh().secret()));
+        byte[] accessKeyBytes = Decoders.BASE64.decode(jwtProperties.access().secret());
+        byte[] refreshKeyBytes = Decoders.BASE64.decode(jwtProperties.refresh().secret());
+
+        if (accessKeyBytes.length < 32) {
+            throw new IllegalArgumentException("Access Token secret은 최소 256비트(32바이트)여야 합니다.");
+        }
+        if (refreshKeyBytes.length < 32) {
+            throw new IllegalArgumentException("Refresh Token secret은 최소 256비트(32바이트)여야 합니다.");
+        }
+
+        this.accessKey = Keys.hmacShaKeyFor(accessKeyBytes);
+        this.refreshKey = Keys.hmacShaKeyFor(refreshKeyBytes);
     }
 
     // ===== Access Token =====

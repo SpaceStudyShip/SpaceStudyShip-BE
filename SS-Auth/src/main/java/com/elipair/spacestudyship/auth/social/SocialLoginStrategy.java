@@ -1,6 +1,6 @@
 package com.elipair.spacestudyship.auth.social;
 
-import com.elipair.spacestudyship.member.entity.SocialType;
+import com.elipair.spacestudyship.member.constant.SocialType;
 
 public interface SocialLoginStrategy {
 

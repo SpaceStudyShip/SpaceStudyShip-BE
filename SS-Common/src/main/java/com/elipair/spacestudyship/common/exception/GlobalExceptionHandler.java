@@ -18,7 +18,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(CustomException.class)
     public ResponseEntity<ErrorResponse> handleCustomException(CustomException ex) {
         ErrorCode errorCode = ex.getErrorCode();
-        log.info("비즈니스 예외 발생 | status={}, message=\"{}\"",
+        log.info("[Exception] 비즈니스 예외 발생 | status={}, message={}",
                 errorCode.getHttpStatus().value(), errorCode.getMessage());
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
@@ -30,7 +30,7 @@ public class GlobalExceptionHandler {
         String detail = ex.getBindingResult().getFieldErrors().stream()
                 .map(error -> error.getField() + ": " + error.getDefaultMessage())
                 .collect(Collectors.joining(", "));
-        log.info("입력값 검증 실패 | detail=\"{}\"", detail);
+        log.info("[Validation] 입력값 검증 실패 | detail={}", detail);
         ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
@@ -63,7 +63,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception ex) {
-        log.error("예상하지 못한 예외 발생 | ", ex);
+        log.error("[Exception] 예상하지 못한 예외 발생 | error={}", ex.getMessage(), ex);
         ErrorCode errorCode = ErrorCode.INTERNAL_SERVER_ERROR;
         return ResponseEntity
                 .status(errorCode.getHttpStatus())

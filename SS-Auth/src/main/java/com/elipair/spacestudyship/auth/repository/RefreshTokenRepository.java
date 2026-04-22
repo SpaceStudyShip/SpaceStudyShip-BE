@@ -5,6 +5,7 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Repository;
 
 import java.time.Duration;
+import java.util.Optional;
 
 @Repository
 @RequiredArgsConstructor
@@ -19,9 +20,8 @@ public class RefreshTokenRepository {
         redisTemplate.opsForValue().set(key, refreshToken, Duration.ofMillis(ttlMillis));
     }
 
-    public String findByMemberId(Long memberId) {
-        String key = KEY_PREFIX + memberId;
-        return redisTemplate.opsForValue().get(key);
+    public Optional<String> findByMemberId(Long memberId) {
+        return Optional.ofNullable(redisTemplate.opsForValue().get(KEY_PREFIX + memberId));
     }
 
     public void delete(Long memberId) {

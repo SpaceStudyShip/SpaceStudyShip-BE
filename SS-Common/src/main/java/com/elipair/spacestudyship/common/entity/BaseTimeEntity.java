@@ -1,4 +1,4 @@
-package com.elipair.spacestudyship.common;
+package com.elipair.spacestudyship.common.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;

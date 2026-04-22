@@ -1,15 +1,13 @@
 package com.elipair.spacestudyship.auth.service;
 
-import com.elipair.spacestudyship.auth.domain.Tokens;
+import com.elipair.spacestudyship.auth.dto.*;
 import com.elipair.spacestudyship.auth.jwt.JwtTokenProvider;
 import com.elipair.spacestudyship.auth.repository.RefreshTokenRepository;
-import com.elipair.spacestudyship.auth.service.dto.LoginCommand;
-import com.elipair.spacestudyship.auth.service.dto.LoginResult;
 import com.elipair.spacestudyship.auth.social.SocialLoginStrategy;
 import com.elipair.spacestudyship.common.exception.CustomException;
 import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.member.entity.Member;
-import com.elipair.spacestudyship.member.entity.SocialType;
+import com.elipair.spacestudyship.member.constant.SocialType;
 import com.elipair.spacestudyship.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,13 +35,12 @@ public class AuthService {
      * - 기존 회원: 토큰만 재발급
      */
     @Transactional
-    public LoginResult login(LoginCommand command) {
-        String socialId = getSocialId(command.socialType(), command.idToken());
-        AuthMemberData authMemberData = findOrRegisterMember(socialId, command.socialType());
+    public LoginResponse login(LoginRequest request) {
+        String socialId = getSocialId(request.socialType(), request.idToken());
+        AuthMemberDto authMemberData = findOrRegisterMember(socialId, request.socialType());
         Member member = authMemberData.member;
         Tokens tokens = issueTokens(member);
-
-        return LoginResult.of(member, authMemberData.isNewMember, tokens);
+        return new LoginResponse(member.getId(), member.getNickname(), tokens, authMemberData.isNewMember);
     }
 
     private String getSocialId(SocialType socialType, String idToken) {
@@ -54,9 +51,9 @@ public class AuthService {
         return strategy.validateAndGetSocialId(idToken);
     }
 
-    private AuthMemberData findOrRegisterMember(String socialId, SocialType socialType) {
+    private AuthMemberDto findOrRegisterMember(String socialId, SocialType socialType) {
         return memberRepository.findBySocialIdAndSocialType(socialId, socialType)
-                .map(member -> new AuthMemberData(member, false))
+                .map(member -> new AuthMemberDto(member, false))
                 .orElseGet(() -> {
                     String nickname = generateUniqueNickname();
                     Member newMember = Member.signUp(socialId, socialType, nickname);
@@ -64,7 +61,7 @@ public class AuthService {
 
                     log.info("[SignUp] 신규 회원가입 성공 | memberId={}, nickname={}, socialType={}",
                             newMember.getId(), nickname, socialType);
-                    return new AuthMemberData(newMember, true);
+                    return new AuthMemberDto(newMember, true);
                 });
     }
 
@@ -93,17 +90,26 @@ public class AuthService {
     /**
      * Access Token 재발급
      */
-    @Transactional(readOnly = true)
-    public Tokens reissueTokens(String refreshToken) {
+    @Transactional
+    public ReissueResponse reissue(ReissueRequest request) {
+        String refreshToken = request.refreshToken();
         Long memberId = jwtTokenProvider.getMemberIdFromRefreshToken(refreshToken);
+        String storedRefreshToken = refreshTokenRepository.findByMemberId(memberId).orElse(null);
 
-        String storedRefreshToken = refreshTokenRepository.findByMemberId(memberId);
-        if (!refreshToken.equals(storedRefreshToken)) {
+        if (storedRefreshToken == null) {
+            log.warn("[Security] Refresh Token 재사용 감지 - 잠재적 탈취 | memberId={}", memberId);
             throw new CustomException(ErrorCode.INVALID_TOKEN);
         }
 
+        if (!refreshToken.equals(storedRefreshToken)) {
+            refreshTokenRepository.delete(memberId);
+            log.warn("[Security] Refresh Token 불일치 - 강제 로그아웃 처리 | memberId={}", memberId);
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
+
+        refreshTokenRepository.delete(memberId);
         Member member = memberRepository.getByMemberId(memberId);
-        return issueTokens(member);
+        return new ReissueResponse(issueTokens(member));
     }
 
     /**
@@ -115,9 +121,4 @@ public class AuthService {
                 .ifPresent(refreshTokenRepository::delete);
     }
 
-    private record AuthMemberData(
-            Member member,
-            boolean isNewMember
-    ) {
-    }
 }
