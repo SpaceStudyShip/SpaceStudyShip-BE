@@ -1,6 +1,14 @@
 spring:
   application:
-    name: space-study-ship
+    name: spacestudyship
 
   profiles:
     active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  mvc:
+    hiddenmethod:
+      filter:
+        enabled: true
+
+server:
+  port: 8080

@@ -38,9 +38,9 @@ public class AuthService {
     public LoginResponse login(LoginRequest request) {
         String socialId = getSocialId(request.socialType(), request.idToken());
         AuthMemberDto authMemberData = findOrRegisterMember(socialId, request.socialType());
-        Member member = authMemberData.member;
+        Member member = authMemberData.member();
         Tokens tokens = issueTokens(member);
-        return new LoginResponse(member.getId(), member.getNickname(), tokens, authMemberData.isNewMember);
+        return new LoginResponse(member.getId(), member.getNickname(), tokens, authMemberData.isNewMember());
     }
 
     private String getSocialId(SocialType socialType, String idToken) {

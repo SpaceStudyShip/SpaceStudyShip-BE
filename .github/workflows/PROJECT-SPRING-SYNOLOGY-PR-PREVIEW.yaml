@@ -31,14 +31,14 @@ name: PROJECT-SPRING-SYNOLOGY-PR-PREVIEW
 # ⚠️ [영역 1] 프로젝트별 설정 - 다른 프로젝트에서 사용 시 이 섹션만 수정하세요
 # ===================================================================
 env:
-  # 프로젝트 고유 식별자 (컨테이너명, 이미지명, 도메인에 사용) (프로젝트별 수정 필요)
-  PROJECT_NAME: suh-project-utility
+  # 프로젝트 고유 식별자 (컨테이너명, 이미지명, 도메인에 사용)
+  PROJECT_NAME: spacestudyship
 
-  # Spring Boot 빌드 설정 (프로젝트별 수정 필요)
-  JAVA_VERSION: '17'
+  # Spring Boot 빌드 설정
+  JAVA_VERSION: '21'
   GRADLE_BUILD_CMD: './gradlew clean build -x test -Dspring.profiles.active=prod'
-  JAR_PATH: 'Suh-Web/build/libs/*.jar'
-  APPLICATION_YML_PATH: 'Suh-Web/src/main/resources/application-prod.yml'
+  JAR_PATH: 'SS-Web/build/libs/app.jar'
+  APPLICATION_YML_PATH: 'SS-Web/src/main/resources/application-prod.yml'
 
   # Docker 설정 (프로젝트별 수정 필요)
   DOCKERFILE_PATH: './Dockerfile'

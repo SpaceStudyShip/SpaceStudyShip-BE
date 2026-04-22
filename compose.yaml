@@ -1,10 +1,20 @@
 services:
-  mysql:
-    image: 'mysql:latest'
+  postgres:
+    image: 'postgres:16-alpine'
     environment:
-      - 'MYSQL_DATABASE=mydatabase'
-      - 'MYSQL_PASSWORD=secret'
-      - 'MYSQL_ROOT_PASSWORD=verysecret'
-      - 'MYSQL_USER=myuser'
+      POSTGRES_DB: spacestudyship
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: '\\\\'
     ports:
-      - '3306'
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: 'redis:7-alpine'
+    command: redis-server --requirepass '\\\\'
+    ports:
+      - '6379:6379'
+
+volumes:
+  postgres_data:
