@@ -1,21 +1,28 @@
 package com.elipair.spacestudyship.controller.auth;
 
 import com.elipair.spacestudyship.auth.dto.CheckNicknameResponse;
+import com.elipair.spacestudyship.auth.dto.UpdateNicknameRequest;
+import com.elipair.spacestudyship.auth.dto.UpdateNicknameResponse;
 import com.elipair.spacestudyship.auth.interceptor.LoginMember;
 import com.elipair.spacestudyship.auth.interceptor.LoginMemberArgumentResolver;
 import com.elipair.spacestudyship.auth.service.AuthService;
+import com.elipair.spacestudyship.common.exception.CustomException;
+import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.common.exception.GlobalExceptionHandler;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -26,6 +33,8 @@ class AuthControllerTest {
     AuthService authService;
 
     MockMvc mockMvc;
+
+    ObjectMapper objectMapper = new ObjectMapper();
 
     @BeforeEach
     void setUp() {
@@ -92,6 +101,74 @@ class AuthControllerTest {
     void checkNickname_unauthenticated() throws Exception {
         mockMvc.perform(get("/api/auth/check-nickname")
                         .param("nickname", "우주탐험가"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ========== PATCH /api/auth/nickname ==========
+
+    @Test
+    @DisplayName("updateNickname: 정상 요청이면 200과 바뀐 nickname 반환")
+    void updateNickname_success() throws Exception {
+        // given
+        UpdateNicknameRequest body = new UpdateNicknameRequest("우주탐험가");
+        given(authService.updateNickname(1L, body))
+                .willReturn(new UpdateNicknameResponse("우주탐험가"));
+
+        // when / then
+        mockMvc.perform(patch("/api/auth/nickname")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body))
+                        .requestAttr("loginMember", new LoginMember(1L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nickname").value("우주탐험가"));
+    }
+
+    @Test
+    @DisplayName("updateNickname: 1자 닉네임이면 400")
+    void updateNickname_tooShort() throws Exception {
+        UpdateNicknameRequest body = new UpdateNicknameRequest("가");
+
+        mockMvc.perform(patch("/api/auth/nickname")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body))
+                        .requestAttr("loginMember", new LoginMember(1L)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("updateNickname: 특수문자 포함이면 400")
+    void updateNickname_invalidCharacter() throws Exception {
+        UpdateNicknameRequest body = new UpdateNicknameRequest("우주!탐험");
+
+        mockMvc.perform(patch("/api/auth/nickname")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body))
+                        .requestAttr("loginMember", new LoginMember(1L)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("updateNickname: 중복 닉네임이면 409")
+    void updateNickname_duplicated() throws Exception {
+        UpdateNicknameRequest body = new UpdateNicknameRequest("우주탐험가");
+        given(authService.updateNickname(1L, body))
+                .willThrow(new CustomException(ErrorCode.DUPLICATED_NICKNAME));
+
+        mockMvc.perform(patch("/api/auth/nickname")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body))
+                        .requestAttr("loginMember", new LoginMember(1L)))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    @DisplayName("updateNickname: 인증 정보가 없으면 401")
+    void updateNickname_unauthenticated() throws Exception {
+        UpdateNicknameRequest body = new UpdateNicknameRequest("우주탐험가");
+
+        mockMvc.perform(patch("/api/auth/nickname")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(body)))
                 .andExpect(status().isUnauthorized());
     }
 }

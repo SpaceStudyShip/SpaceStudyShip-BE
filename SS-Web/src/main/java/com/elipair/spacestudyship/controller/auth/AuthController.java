@@ -3,6 +3,8 @@ package com.elipair.spacestudyship.controller.auth;
 import com.elipair.spacestudyship.auth.dto.CheckNicknameRequest;
 import com.elipair.spacestudyship.auth.dto.CheckNicknameResponse;
 import com.elipair.spacestudyship.auth.dto.LoginRequest;
+import com.elipair.spacestudyship.auth.dto.UpdateNicknameRequest;
+import com.elipair.spacestudyship.auth.dto.UpdateNicknameResponse;
 import com.elipair.spacestudyship.auth.dto.LoginResponse;
 import com.elipair.spacestudyship.auth.dto.LogoutRequest;
 import com.elipair.spacestudyship.auth.dto.ReissueRequest;
@@ -55,5 +57,13 @@ public class AuthController {
             @AuthMember LoginMember loginMember,
             @Valid @ModelAttribute CheckNicknameRequest request) {
         return ResponseEntity.ok(authService.checkNickname(request.nickname()));
+    }
+
+    @Operation(summary = "닉네임 변경")
+    @PatchMapping("/nickname")
+    public ResponseEntity<UpdateNicknameResponse> updateNickname(
+            @AuthMember LoginMember loginMember,
+            @RequestBody @Valid UpdateNicknameRequest request) {
+        return ResponseEntity.ok(authService.updateNickname(loginMember.memberId(), request));
     }
 }
