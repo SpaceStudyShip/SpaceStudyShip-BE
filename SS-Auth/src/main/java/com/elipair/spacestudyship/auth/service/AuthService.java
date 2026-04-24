@@ -130,4 +130,17 @@ public class AuthService {
         return new CheckNicknameResponse(!exists);
     }
 
+    /**
+     * 닉네임 변경
+     */
+    @Transactional
+    public UpdateNicknameResponse updateNickname(Long memberId, UpdateNicknameRequest request) {
+        if (memberRepository.existsByNickname(request.nickname())) {
+            throw new CustomException(ErrorCode.DUPLICATED_NICKNAME);
+        }
+        Member member = memberRepository.getByMemberId(memberId);
+        member.updateNickname(request.nickname());
+        return new UpdateNicknameResponse(member.getNickname());
+    }
+
 }
