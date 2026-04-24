@@ -1,10 +1,14 @@
 package com.elipair.spacestudyship.controller.auth;
 
+import com.elipair.spacestudyship.auth.dto.CheckNicknameRequest;
+import com.elipair.spacestudyship.auth.dto.CheckNicknameResponse;
 import com.elipair.spacestudyship.auth.dto.LoginRequest;
 import com.elipair.spacestudyship.auth.dto.LoginResponse;
 import com.elipair.spacestudyship.auth.dto.LogoutRequest;
 import com.elipair.spacestudyship.auth.dto.ReissueRequest;
 import com.elipair.spacestudyship.auth.dto.ReissueResponse;
+import com.elipair.spacestudyship.auth.interceptor.AuthMember;
+import com.elipair.spacestudyship.auth.interceptor.LoginMember;
 import com.elipair.spacestudyship.auth.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,5 +47,13 @@ public class AuthController {
     public ResponseEntity<Void> logout(@RequestBody @Valid LogoutRequest request) {
         authService.logout(request.refreshToken());
         return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "닉네임 중복 확인")
+    @GetMapping("/check-nickname")
+    public ResponseEntity<CheckNicknameResponse> checkNickname(
+            @AuthMember LoginMember loginMember,
+            @Valid @ModelAttribute CheckNicknameRequest request) {
+        return ResponseEntity.ok(authService.checkNickname(request.nickname()));
     }
 }
