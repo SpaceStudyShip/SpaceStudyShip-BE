@@ -121,4 +121,13 @@ public class AuthService {
                 .ifPresent(refreshTokenRepository::delete);
     }
 
+    /**
+     * 닉네임 중복 확인
+     */
+    @Transactional(readOnly = true)
+    public CheckNicknameResponse checkNickname(String nickname) {
+        boolean exists = memberRepository.existsByNickname(nickname);
+        return new CheckNicknameResponse(!exists);
+    }
+
 }
