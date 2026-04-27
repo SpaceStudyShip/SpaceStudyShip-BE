@@ -46,3 +46,4 @@ application-local.yml
 
 ### Claude Config (PAT 포함 민감 정보) ###
 .claude/config.json
+.report/
