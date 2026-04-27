@@ -11,6 +11,7 @@ import com.elipair.spacestudyship.member.constant.SocialType;
 import com.elipair.spacestudyship.member.repository.MemberRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -119,6 +120,40 @@ public class AuthService {
     public void logout(String refreshToken) {
         jwtTokenProvider.getMemberIdFromRefreshTokenSafely(refreshToken)
                 .ifPresent(refreshTokenRepository::delete);
+    }
+
+    /**
+     * 닉네임 중복 확인
+     */
+    @Transactional(readOnly = true)
+    public CheckNicknameResponse checkNickname(String nickname) {
+        boolean exists = memberRepository.existsByNickname(nickname);
+        return new CheckNicknameResponse(!exists);
+    }
+
+    /**
+     * 닉네임 변경
+     */
+    @Transactional
+    public UpdateNicknameResponse updateNickname(Long memberId, UpdateNicknameRequest request) {
+        Member member = memberRepository.getByMemberId(memberId);
+        String newNickname = request.nickname();
+
+        if (member.getNickname().equals(newNickname)) {
+            return new UpdateNicknameResponse(member.getNickname());
+        }
+
+        if (memberRepository.existsByNickname(newNickname)) {
+            throw new CustomException(ErrorCode.DUPLICATED_NICKNAME);
+        }
+
+        try {
+            member.updateNickname(newNickname);
+            memberRepository.flush();
+        } catch (DataIntegrityViolationException e) {
+            throw new CustomException(ErrorCode.DUPLICATED_NICKNAME);
+        }
+        return new UpdateNicknameResponse(member.getNickname());
     }
 
 }
