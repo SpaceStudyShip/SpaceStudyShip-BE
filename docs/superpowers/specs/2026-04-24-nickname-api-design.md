@@ -15,7 +15,7 @@
 ### 이번 PR 범위
 - `GET /api/auth/check-nickname` (신규)
 - `PATCH /api/auth/nickname` (신규)
-- `WebConfig.addInterceptors.excludePathPatterns` 축소 (공개 API인 `login`/`reissue`만 제외)
+- `WebConfig.addInterceptors.excludePathPatterns` 축소 (공개 API인 `login`/`reissue`/`logout`만 제외)
 - Service / Controller 테스트 코드 추가
 - `ErrorCode`에 필요 시 신규 코드 추가 (현재는 기존 `INVALID_INPUT_VALUE`, `DUPLICATED_NICKNAME` 활용)
 
@@ -30,7 +30,7 @@
 
 ### 2-1. 닉네임 중복 확인
 
-```
+```http
 GET /api/auth/check-nickname?nickname={nickname}
 Authorization: Bearer {accessToken}
 ```
@@ -47,7 +47,7 @@ Authorization: Bearer {accessToken}
 
 ### 2-2. 닉네임 변경
 
-```
+```http
 PATCH /api/auth/nickname
 Authorization: Bearer {accessToken}
 Content-Type: application/json
@@ -65,7 +65,11 @@ Content-Type: application/json
 | 미인증 | `401 UNAUTHENTICATED_REQUEST` |
 | 회원 없음 | `404 MEMBER_NOT_FOUND` (이론상, 유효 토큰+DB 삭제 동시 발생 시) |
 
-**동작**: 중복 체크 후 `Member.updateNickname()`로 갱신. JPA dirty checking으로 `UPDATE` 쿼리 발생. 토큰 재발급 없음.
+**동작**:
+1. 회원 조회 후, 요청 닉네임이 **본인 현재 닉네임과 동일**하면 중복 검사 없이 그대로 응답한다(NO-OP).
+2. 다른 회원이 사용 중이면 `409 DUPLICATED_NICKNAME`.
+3. 통과 시 `Member.updateNickname()`로 갱신, `flush()`까지 명시적으로 호출해 unique 제약 위반을 동기적으로 감지한다.
+4. JPA dirty checking으로 `UPDATE` 쿼리 발생. 토큰 재발급 없음.
 
 ### 2-3. 닉네임 형식 규칙
 
@@ -78,7 +82,7 @@ Content-Type: application/json
 
 ## 3. 파일 구조
 
-```
+```text
 SS-Web/
   src/main/java/com/elipair/spacestudyship/
     config/WebConfig.java               [수정] 인터셉터 예외 경로 축소
@@ -125,7 +129,7 @@ SS-Common/ (변경 없음)
 
 ### `GET /api/auth/check-nickname?nickname=...`
 
-```
+```text
 Request → AuthInterceptor (토큰 검증, request.loginMember 세팅)
        → LoginMemberArgumentResolver (LoginMember 주입)
        → AuthController.checkNickname(loginMember, @Valid nickname)
@@ -138,16 +142,19 @@ Request → AuthInterceptor (토큰 검증, request.loginMember 세팅)
 
 ### `PATCH /api/auth/nickname`
 
-```
+```text
 Request → AuthInterceptor → LoginMemberArgumentResolver
        → AuthController.updateNickname(loginMember, @Valid UpdateNicknameRequest)
            ↓ 형식 검증 실패 → 400
        → AuthService.updateNickname(loginMember.memberId(), request) [@Transactional]
-           1. existsByNickname(request.nickname())
-              → true면 throw CustomException(DUPLICATED_NICKNAME) [409]
-           2. getByMemberId(memberId)
+           1. getByMemberId(memberId)
               → 없으면 throw CustomException(MEMBER_NOT_FOUND) [404]
-           3. member.updateNickname(request.nickname())  // dirty checking
+           2. 본인 현재 닉네임과 동일하면 그대로 응답(중복 검사 없이 NO-OP)
+           3. existsByNickname(request.nickname())
+              → true면 throw CustomException(DUPLICATED_NICKNAME) [409]
+           4. member.updateNickname(request.nickname())  // dirty checking
+           5. memberRepository.flush()
+              → DataIntegrityViolationException 캐치 시 DUPLICATED_NICKNAME으로 변환 [409]
        → UpdateNicknameResponse(member.getNickname())
        → 200 OK
 ```
@@ -161,7 +168,7 @@ Request → AuthInterceptor → LoginMemberArgumentResolver
 ### 동시성 / 중복 방지
 
 - `PATCH` 요청에서 `existsByNickname` 체크 후 `update` 사이에 동일 닉네임으로 다른 트랜잭션이 `INSERT`/`UPDATE`할 경우 → **DB의 `nickname` unique 제약이 최종 방어선**
-- `@Transactional`로 원자성 확보. unique 제약 위반 시 `DataIntegrityViolationException`이 던져지며, 현재는 `Exception` 핸들러로 500 처리되지만 극히 드문 경합 상황이므로 이번 범위에서는 특별한 처리 없음 (별도 고도화 항목)
+- 서비스 메서드는 `member.updateNickname()` 직후 `memberRepository.flush()`로 즉시 DB에 반영하고, 발생하는 `DataIntegrityViolationException`을 `CustomException(DUPLICATED_NICKNAME)`으로 변환해 일관된 409 응답을 보장한다.
 
 ---
 
@@ -192,9 +199,12 @@ Request → AuthInterceptor → LoginMemberArgumentResolver
 .excludePathPatterns(
         "/api/auth/login",
         "/api/auth/reissue",
+        "/api/auth/logout",
         "/actuator/health"
 );
 ```
+
+> `logout`은 `AuthService.logout(String refreshToken)`이 **리프레시 토큰만** 사용하므로, 액세스 토큰이 만료된 상태에서도 호출 가능해야 한다. 그래서 인터셉터의 액세스 토큰 검증 대상에서 제외한다.
 
 `SecurityUrls.AUTH_WHITELIST`는 이번 범위에서 **변경하지 않는다**. Spring Security 계층 전면 재설계(JWT Security Filter 도입 등)는 별도 이슈에서 다룬다.
 
@@ -204,7 +214,7 @@ Request → AuthInterceptor → LoginMemberArgumentResolver
 |-----|----------|---------|
 | `POST /api/auth/login` | 공개 | 공개 (유지) |
 | `POST /api/auth/reissue` | 공개 | 공개 (유지) |
-| `POST /api/auth/logout` | 공개 (스펙 위반) | 인증 필요 (AuthInterceptor가 검증) |
+| `POST /api/auth/logout` | 공개 | 공개 (유지: 리프레시 토큰 기반이므로 액세스 토큰 검증 제외) |
 | `DELETE /api/auth/withdraw` | 미구현 | 미구현 (영향 없음) |
 | `GET /api/auth/check-nickname` | 신규 | 인증 필요 |
 | `PATCH /api/auth/nickname` | 신규 | 인증 필요 |
@@ -223,7 +233,9 @@ Request → AuthInterceptor → LoginMemberArgumentResolver
 
 **updateNickname**
 - 사용 가능한 닉네임 입력 → `Member.updateNickname` 호출, `UpdateNicknameResponse` 반환
-- 이미 존재하는 닉네임 입력 → `CustomException(DUPLICATED_NICKNAME)` throw, 업데이트 호출 안 됨
+- 본인 현재 닉네임과 동일한 값 입력 → 중복 검사 없이 그대로 응답 (NO-OP)
+- 이미 존재하는 닉네임 입력 → `CustomException(DUPLICATED_NICKNAME)` throw, `flush` 호출 안 됨
+- `flush` 단계에서 `DataIntegrityViolationException` 발생 → `CustomException(DUPLICATED_NICKNAME)`으로 변환
 - `memberId`로 조회 실패 → `CustomException(MEMBER_NOT_FOUND)` throw
 
 ### 6-2. `AuthControllerTest` (슬라이스 테스트, MockMvc)
@@ -242,9 +254,11 @@ Request → AuthInterceptor → LoginMemberArgumentResolver
 
 ### 6-3. Mocking 방침
 
-- Service 테스트: `@ExtendWith(MockitoExtension.class)` + `@Mock MemberRepository`
-- Controller 테스트: `@WebMvcTest(AuthController.class)` + `AuthService` 모킹, `LoginMemberArgumentResolver` 모킹 또는 request attribute에 `loginMember` 직접 세팅으로 인증 주입
-- 모킹 어노테이션은 Spring Boot 4.x 환경에 맞게 `@MockitoBean` 계열 사용 (Spring Framework 6.2+ 표준)
+이번 PR은 **standalone 방식**으로 통일한다.
+
+- Service 테스트: `@ExtendWith(MockitoExtension.class)` + `@Mock MemberRepository` + `@InjectMocks AuthService`
+- Controller 테스트: `@ExtendWith(MockitoExtension.class)` + `@Mock AuthService` + `MockMvcBuilders.standaloneSetup(...)` 로 컨트롤러 단독 구성. 인증은 `requestAttr("loginMember", new LoginMember(...))`로 주입하고, 직접 등록한 `LoginMemberArgumentResolver`가 이를 읽는다.
+- `@WebMvcTest`/`@MockitoBean` 기반 슬라이스는 이번 범위에서 사용하지 않는다 (Spring 컨텍스트 부팅 비용 절감 및 인터셉터 우회). 향후 통합 테스트 인프라 정비 이슈에서 표준화한다.
 
 ### 6-4. 통합 테스트
 
