@@ -17,6 +17,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.Map;
 
@@ -24,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -85,8 +87,8 @@ class AuthServiceTest {
                 .socialType(SocialType.GOOGLE)
                 .nickname("기존닉네임")
                 .build();
-        given(memberRepository.existsByNickname(newNickname)).willReturn(false);
         given(memberRepository.getByMemberId(memberId)).willReturn(member);
+        given(memberRepository.existsByNickname(newNickname)).willReturn(false);
 
         // when
         UpdateNicknameResponse response = authService.updateNickname(memberId, request);
@@ -94,6 +96,31 @@ class AuthServiceTest {
         // then
         assertThat(response.nickname()).isEqualTo(newNickname);
         assertThat(member.getNickname()).isEqualTo(newNickname);
+        verify(memberRepository).flush();
+    }
+
+    @Test
+    @DisplayName("updateNickname: 본인 현재 닉네임과 같으면 중복 검사 없이 그대로 통과")
+    void updateNickname_sameAsCurrent() {
+        // given
+        Long memberId = 1L;
+        String currentNickname = "우주탐험가";
+        UpdateNicknameRequest request = new UpdateNicknameRequest(currentNickname);
+        Member member = Member.builder()
+                .id(memberId)
+                .socialId("social-id")
+                .socialType(SocialType.GOOGLE)
+                .nickname(currentNickname)
+                .build();
+        given(memberRepository.getByMemberId(memberId)).willReturn(member);
+
+        // when
+        UpdateNicknameResponse response = authService.updateNickname(memberId, request);
+
+        // then
+        assertThat(response.nickname()).isEqualTo(currentNickname);
+        verify(memberRepository, never()).existsByNickname(any());
+        verify(memberRepository, never()).flush();
     }
 
     @Test
@@ -103,13 +130,44 @@ class AuthServiceTest {
         Long memberId = 1L;
         String newNickname = "우주탐험가";
         UpdateNicknameRequest request = new UpdateNicknameRequest(newNickname);
+        Member member = Member.builder()
+                .id(memberId)
+                .socialId("social-id")
+                .socialType(SocialType.GOOGLE)
+                .nickname("기존닉네임")
+                .build();
+        given(memberRepository.getByMemberId(memberId)).willReturn(member);
         given(memberRepository.existsByNickname(newNickname)).willReturn(true);
 
         // when / then
         assertThatThrownBy(() -> authService.updateNickname(memberId, request))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.DUPLICATED_NICKNAME);
-        verify(memberRepository, never()).getByMemberId(any());
+        verify(memberRepository, never()).flush();
+    }
+
+    @Test
+    @DisplayName("updateNickname: flush 단계 race로 DataIntegrityViolation 발생 시 DUPLICATED_NICKNAME으로 변환")
+    void updateNickname_raceCondition() {
+        // given
+        Long memberId = 1L;
+        String newNickname = "우주탐험가";
+        UpdateNicknameRequest request = new UpdateNicknameRequest(newNickname);
+        Member member = Member.builder()
+                .id(memberId)
+                .socialId("social-id")
+                .socialType(SocialType.GOOGLE)
+                .nickname("기존닉네임")
+                .build();
+        given(memberRepository.getByMemberId(memberId)).willReturn(member);
+        given(memberRepository.existsByNickname(newNickname)).willReturn(false);
+        willThrow(new DataIntegrityViolationException("uk_nickname"))
+                .given(memberRepository).flush();
+
+        // when / then
+        assertThatThrownBy(() -> authService.updateNickname(memberId, request))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.DUPLICATED_NICKNAME);
     }
 
     @Test
@@ -119,12 +177,12 @@ class AuthServiceTest {
         Long memberId = 1L;
         String newNickname = "우주탐험가";
         UpdateNicknameRequest request = new UpdateNicknameRequest(newNickname);
-        given(memberRepository.existsByNickname(newNickname)).willReturn(false);
         given(memberRepository.getByMemberId(memberId)).willThrow(new CustomException(ErrorCode.MEMBER_NOT_FOUND));
 
         // when / then
         assertThatThrownBy(() -> authService.updateNickname(memberId, request))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
+        verify(memberRepository, never()).existsByNickname(any());
     }
 }
