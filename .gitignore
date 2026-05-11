@@ -35,7 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
-
+.DS_Store
 *.properties
 !gradle/wrapper/gradle-wrapper.properties
 
