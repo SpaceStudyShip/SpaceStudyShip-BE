@@ -36,3 +36,7 @@ management:
     web:
       exposure:
         include: health
+
+# Firebase Admin SDK
+firebase:
+  admin-sdk-path: classpath:firebase/spacestudyship-firebase-adminsdk-fbsvc-7e86c5c253.json
