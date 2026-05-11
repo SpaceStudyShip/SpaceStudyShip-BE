@@ -32,7 +32,7 @@ Firebase ID Token을 백엔드에 전송하여 JWT를 발급받습니다.
 
 | 필드 | 타입 | 필수 | 설명 | 예시 |
 |------|------|------|------|------|
-| `socialPlatform` | String | O | 소셜 로그인 플랫폼 | `"GOOGLE"`, `"APPLE"` |
+| `socialType` | String | O | 소셜 로그인 플랫폼 | `"GOOGLE"`, `"APPLE"`, `"KAKAO"` |
 | `idToken` | String | O | Firebase에서 발급받은 ID Token | `"eyJhbG..."` |
 | `fcmToken` | String | O | Firebase Cloud Messaging 디바이스 토큰 | `"dK3mL..."` |
 | `deviceType` | String | O | 디바이스 OS 타입 | `"IOS"`, `"ANDROID"` |
@@ -40,7 +40,7 @@ Firebase ID Token을 백엔드에 전송하여 JWT를 발급받습니다.
 
 ```json
 {
-  "socialPlatform": "GOOGLE",
+  "socialType": "GOOGLE",
   "idToken": "eyJhbGciOiJSUzI1NiIs...",
   "fcmToken": "dK3mL9xRTp2...",
   "deviceType": "IOS",
@@ -78,7 +78,7 @@ Firebase ID Token을 백엔드에 전송하여 JWT를 발급받습니다.
 | Status | code | 상황 |
 |--------|------|------|
 | 400 | `INVALID_ID_TOKEN` | Firebase ID Token 검증 실패 |
-| 400 | `UNSUPPORTED_PLATFORM` | socialPlatform이 GOOGLE/APPLE이 아닌 경우 |
+| 400 | `UNSUPPORTED_SOCIAL_TYPE` | socialType이 GOOGLE/APPLE/KAKAO가 아닌 경우 |
 
 ### 서버 처리 로직
 
@@ -338,3 +338,8 @@ GET /api/auth/check-nickname?nickname=우주탐험가
 | `fcm_token` | VARCHAR(255) | FCM 토큰 |
 | `refresh_token` | VARCHAR(512) | Refresh Token |
 | `last_login_at` | TIMESTAMP | 마지막 로그인 |
+| `created_at` | TIMESTAMP | 생성 시각 |
+| `updated_at` | TIMESTAMP | 수정 시각 |
+
+> Unique 제약: `(member_id, device_id)` 컴포지트. 같은 디바이스를 다른 회원이 쓰는 경우는 별개 row.
+> FK: `member_id` → `members.id`, `ON DELETE CASCADE` (회원 탈퇴 시 자동 삭제).
