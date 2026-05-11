@@ -9,6 +9,7 @@ import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.member.entity.Member;
 import com.elipair.spacestudyship.member.constant.SocialType;
 import com.elipair.spacestudyship.member.repository.MemberRepository;
+import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import lombok.RequiredArgsConstructor;
@@ -161,16 +162,31 @@ public class AuthService {
 
     /**
      * 회원 탈퇴 - DB / Redis / Firebase 사용자 삭제
+     * Firebase 예외는 멱등성 유지를 위해 모두 무시 (로그만 기록).
      */
     @Transactional
-    public void withdraw(Long memberId) throws FirebaseAuthException {
+    public void withdraw(Long memberId) {
         Member member = memberRepository.findById(memberId).orElse(null);
         if (member != null) {
             memberRepository.delete(member);
         }
         refreshTokenRepository.delete(memberId);
         if (member != null) {
-            firebaseAuth.deleteUser(member.getSocialId());
+            deleteFirebaseUserSafely(memberId, member.getSocialId());
+        }
+    }
+
+    private void deleteFirebaseUserSafely(Long memberId, String socialId) {
+        try {
+            firebaseAuth.deleteUser(socialId);
+        } catch (FirebaseAuthException e) {
+            if (e.getAuthErrorCode() == AuthErrorCode.USER_NOT_FOUND) {
+                log.warn("[Withdraw] Firebase 사용자 이미 없음 | memberId={}, socialId={}",
+                        memberId, socialId);
+            } else {
+                log.error("[Withdraw] Firebase 사용자 삭제 실패 | memberId={}, socialId={}, error={}",
+                        memberId, socialId, e.getMessage());
+            }
         }
     }
 
