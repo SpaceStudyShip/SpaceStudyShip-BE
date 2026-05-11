@@ -35,7 +35,139 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @Operation(summary = "소셜 로그인")
+    @Operation(
+            summary = "소셜 로그인",
+            description = """
+                    소셜 플랫폼(Firebase 등)에서 발급받은 ID Token을 백엔드에 전송하여 JWT를 발급받습니다.
+                    해당 유저가 DB에 없으면 **자동으로 회원가입** 처리됩니다 (랜덤 닉네임 부여).
+
+                    ### 응답 코드
+                    - `200 OK` — 기존 회원 로그인 성공
+                    - `201 Created` — 신규 회원 가입 + 로그인 성공 (클라이언트는 닉네임 설정 화면으로 이동 권장)
+
+                    ### 인증 불필요
+                    이 엔드포인트는 공개 API입니다. `Authorization` 헤더 없이 호출하세요.
+
+                    ### 서버 처리 흐름
+                    1. 소셜 ID Token 검증 (현재는 stub — 추후 Firebase Admin SDK 연동 예정)
+                    2. socialType + socialId 로 DB 조회
+                       - 존재: 기존 회원 정보로 JWT 발급
+                       - 없음: 신규 회원 생성 (랜덤 닉네임), JWT 발급
+                    3. Refresh Token 을 Redis 에 저장
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "기존 회원 로그인 성공.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = LoginResponse.class),
+                            examples = @ExampleObject(
+                                    name = "ExistingMember",
+                                    summary = "기존 회원 로그인",
+                                    value = """
+                                            {
+                                              "memberId": 1,
+                                              "nickname": "민첩한괴도5308",
+                                              "tokens": {
+                                                "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+                                                "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+                                              },
+                                              "isNewMember": false
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "201",
+                    description = "신규 회원 가입 + 로그인 성공. 응답 본문은 200과 동일 구조이며 `isNewMember: true`.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = LoginResponse.class),
+                            examples = @ExampleObject(
+                                    name = "NewMember",
+                                    summary = "신규 회원 가입",
+                                    value = """
+                                            {
+                                              "memberId": 42,
+                                              "nickname": "용감한고양이7321",
+                                              "tokens": {
+                                                "accessToken": "eyJhbGciOiJIUzI1NiIs...",
+                                                "refreshToken": "eyJhbGciOiJIUzI1NiIs..."
+                                              },
+                                              "isNewMember": true
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "요청 본문 형식 오류 (필수 필드 누락, socialType 이 유효하지 않은 값 등).",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = {
+                                    @ExampleObject(
+                                            name = "InvalidInputValue",
+                                            summary = "필수 필드 누락",
+                                            value = """
+                                                    {
+                                                      "code": "INVALID_INPUT_VALUE",
+                                                      "message": "idToken: 소셜 인증 토큰(ID Token)은 필수입니다."
+                                                    }
+                                                    """
+                                    ),
+                                    @ExampleObject(
+                                            name = "UnsupportedSocialType",
+                                            summary = "지원하지 않는 소셜 타입",
+                                            value = """
+                                                    {
+                                                      "code": "UNSUPPORTED_SOCIAL_TYPE",
+                                                      "message": "지원하지 않는 소셜 로그인 방식입니다."
+                                                    }
+                                                    """
+                                    )
+                            }
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "소셜 ID Token 검증 실패 (토큰 만료, 변조, 발급자 불일치 등).",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "SocialLoginFailed",
+                                    value = """
+                                            {
+                                              "code": "SOCIAL_LOGIN_FAILED",
+                                              "message": "소셜 로그인에 실패하였습니다."
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "서버 내부 오류. 닉네임 생성 재시도 초과 등.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "InternalServerError",
+                                    value = """
+                                            {
+                                              "code": "INTERNAL_SERVER_ERROR",
+                                              "message": "서버 내부 오류가 발생했습니다."
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
     @PostMapping("/login")
     public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request) {
         LoginResponse response = authService.login(request);
@@ -45,13 +177,157 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "토큰 재발급")
+    @Operation(
+            summary = "토큰 재발급",
+            description = """
+                    만료된 Access Token 을 Refresh Token 으로 재발급합니다.
+                    Refresh Token 도 함께 갱신됩니다 (**Refresh Token Rotation**).
+
+                    ### 인증 불필요
+                    이 엔드포인트는 공개 API입니다. `Authorization` 헤더 대신 요청 본문의 `refreshToken` 으로 인증합니다.
+
+                    ### 클라이언트 처리 흐름
+                    1. 보호된 API 호출 → `401 UNAUTHORIZED` 수신
+                    2. 본 엔드포인트 호출 (`refreshToken` 본문 전송)
+                    3-a. 성공 (200): 새 Access/Refresh Token 저장 후 원래 API 재시도
+                    3-b. 실패 (401 `INVALID_TOKEN`): 로그아웃 처리 + 로그인 화면 이동
+
+                    ### 보안 정책
+                    - Refresh Token 이 Redis 의 저장값과 불일치하면 **탈취 의심**으로 간주, 해당 회원의 모든 세션을 즉시 무효화한 뒤 401 응답.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "토큰 재발급 성공. 클라이언트는 두 토큰 모두 교체 저장해야 합니다.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ReissueResponse.class),
+                            examples = @ExampleObject(
+                                    name = "ReissueSuccess",
+                                    value = """
+                                            {
+                                              "tokens": {
+                                                "accessToken": "eyJhbGciOiJIUzI1NiIs...(new)",
+                                                "refreshToken": "eyJhbGciOiJIUzI1NiIs...(new)"
+                                              }
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "요청 본문 형식 오류 (refreshToken 누락 등).",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "InvalidInputValue",
+                                    value = """
+                                            {
+                                              "code": "INVALID_INPUT_VALUE",
+                                              "message": "refreshToken: Refresh Token은 필수입니다."
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Refresh Token 이 만료되었거나, Redis 저장값과 불일치(탈취 의심)이거나, 변조된 경우. 클라이언트는 로그아웃 처리 후 로그인 화면으로 이동해야 합니다.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "InvalidToken",
+                                    value = """
+                                            {
+                                              "code": "INVALID_TOKEN",
+                                              "message": "인증 정보가 올바르지 않습니다."
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "서버 내부 오류.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "InternalServerError",
+                                    value = """
+                                            {
+                                              "code": "INTERNAL_SERVER_ERROR",
+                                              "message": "서버 내부 오류가 발생했습니다."
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
     @PostMapping("/reissue")
     public ResponseEntity<ReissueResponse> reissue(@RequestBody @Valid ReissueRequest request) {
         return ResponseEntity.ok(authService.reissue(request));
     }
 
-    @Operation(summary = "로그아웃")
+    @Operation(
+            summary = "로그아웃",
+            description = """
+                    서버에서 해당 디바이스의 Refresh Token 을 삭제(무효화)합니다.
+                    클라이언트는 응답 수신 후 로컬에 저장된 Access/Refresh Token 도 함께 삭제해야 합니다.
+
+                    ### 인증 불필요 (실제 동작상)
+                    서버는 요청 본문의 `refreshToken` 에서 memberId 를 추출해 Redis 에서 해당 세션을 삭제합니다.
+                    Refresh Token 이 유효하지 않거나 이미 삭제된 경우에도 멱등하게 **204** 를 응답합니다.
+
+                    ### 단일 디바이스 로그아웃
+                    Refresh Token 은 디바이스별로 발급되므로, 본 호출은 **현재 디바이스의 세션만** 종료합니다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "204",
+                    description = "로그아웃 처리 완료. 응답 본문 없음.",
+                    content = @Content
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "요청 본문 형식 오류 (refreshToken 누락 등).",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "InvalidInputValue",
+                                    value = """
+                                            {
+                                              "code": "INVALID_INPUT_VALUE",
+                                              "message": "refreshToken: Refresh Token은 필수입니다."
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "서버 내부 오류.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "InternalServerError",
+                                    value = """
+                                            {
+                                              "code": "INTERNAL_SERVER_ERROR",
+                                              "message": "서버 내부 오류가 발생했습니다."
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(@RequestBody @Valid LogoutRequest request) {
         authService.logout(request.refreshToken());
@@ -165,7 +441,113 @@ public class AuthController {
         return ResponseEntity.ok(authService.checkNickname(request.nickname()));
     }
 
-    @Operation(summary = "닉네임 변경")
+    @Operation(
+            summary = "닉네임 변경",
+            description = """
+                    사용자의 닉네임을 변경합니다.
+
+                    ### 동작
+                    1. 닉네임 형식 검증 (길이, 허용 문자)
+                    2. 본인 현재 닉네임과 동일하면 NO-OP — 중복 검사 없이 그대로 통과 (200)
+                    3. 다른 회원이 사용 중이면 `409 DUPLICATED_NICKNAME`
+                    4. 통과 시 DB 갱신 + JPA flush 로 unique 제약 위반을 동기적으로 감지 (race condition 처리)
+
+                    ### 닉네임 규칙
+                    - 길이: 2 ~ 10 자
+                    - 허용 문자: 한글, 영문 대소문자, 숫자
+                    - 금지: 공백, 특수문자, 이모지
+
+                    ### 사전 검증
+                    클라이언트는 입력 직후 `GET /api/auth/check-nickname` 로 사용 가능 여부를 먼저 확인하는 것을 권장합니다.
+                    다만 이 호출 후 다른 사용자가 같은 닉네임을 차지하는 race 는 본 엔드포인트가 안전하게 처리합니다.
+                    """
+    )
+    @ApiResponses({
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "닉네임 변경 성공. 응답 본문에 변경된 닉네임 포함.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = UpdateNicknameResponse.class),
+                            examples = @ExampleObject(
+                                    name = "UpdateSuccess",
+                                    value = """
+                                            {
+                                              "nickname": "우주탐험가"
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "닉네임 형식 오류 (길이 미달/초과, 허용되지 않은 문자).",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "InvalidInputValue",
+                                    value = """
+                                            {
+                                              "code": "INVALID_INPUT_VALUE",
+                                              "message": "nickname: 닉네임은 2자 이상 10자 이하여야 합니다."
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "인증 실패 — Access Token 이 헤더에 없거나, 만료되었거나, 유효하지 않은 경우.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "UnauthenticatedRequest",
+                                    value = """
+                                            {
+                                              "code": "UNAUTHENTICATED_REQUEST",
+                                              "message": "로그인이 필요합니다."
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "409",
+                    description = "이미 다른 사용자가 사용 중인 닉네임.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "DuplicatedNickname",
+                                    value = """
+                                            {
+                                              "code": "DUPLICATED_NICKNAME",
+                                              "message": "이미 사용 중인 닉네임입니다."
+                                            }
+                                            """
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "서버 내부 오류.",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ErrorResponse.class),
+                            examples = @ExampleObject(
+                                    name = "InternalServerError",
+                                    value = """
+                                            {
+                                              "code": "INTERNAL_SERVER_ERROR",
+                                              "message": "서버 내부 오류가 발생했습니다."
+                                            }
+                                            """
+                            )
+                    )
+            )
+    })
     @PatchMapping("/nickname")
     public ResponseEntity<UpdateNicknameResponse> updateNickname(
             @AuthMember LoginMember loginMember,
