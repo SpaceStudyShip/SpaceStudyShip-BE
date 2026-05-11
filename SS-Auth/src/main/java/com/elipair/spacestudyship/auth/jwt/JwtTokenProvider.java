@@ -74,20 +74,42 @@ public class JwtTokenProvider {
 
     // ===== Refresh Token =====
 
-    public String createRefreshToken(Member member) {
+    private static final String CLAIM_DEVICE_ID = "did";
+
+    public String createRefreshToken(Member member, String deviceId) {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + jwtProperties.refresh().expiration().toMillis());
 
         return Jwts.builder()
                 .subject(member.getId().toString())
+                .claim(CLAIM_DEVICE_ID, deviceId)
                 .issuedAt(now)
                 .expiration(expiration)
                 .signWith(refreshKey)
                 .compact();
     }
 
-    public Long getMemberIdFromRefreshToken(String refreshToken) {
-        return Long.valueOf(getRefreshClaims(refreshToken).getSubject());
+    public RefreshTokenPayload parseRefreshToken(String refreshToken) {
+        Claims claims = getRefreshClaims(refreshToken);
+        return toPayload(claims);
+    }
+
+    /**
+     * 로그아웃 시 사용 - 만료된 토큰에서도 (memberId, deviceId) 추출 시도
+     */
+    public Optional<RefreshTokenPayload> parseRefreshTokenSafely(String refreshToken) {
+        try {
+            Claims claims = Jwts.parser()
+                    .verifyWith(refreshKey)
+                    .build()
+                    .parseSignedClaims(refreshToken)
+                    .getPayload();
+            return Optional.of(toPayload(claims));
+        } catch (ExpiredJwtException e) {
+            return Optional.of(toPayload(e.getClaims()));
+        } catch (JwtException | IllegalArgumentException e) {
+            return Optional.empty();
+        }
     }
 
     private Claims getRefreshClaims(String refreshToken) {
@@ -106,22 +128,10 @@ public class JwtTokenProvider {
         }
     }
 
-    /**
-     * 로그아웃 시 사용 - 만료된 토큰에서도 memberId 추출 시도
-     */
-    public Optional<Long> getMemberIdFromRefreshTokenSafely(String refreshToken) {
-        try {
-            Claims claims = Jwts.parser()
-                    .verifyWith(refreshKey)
-                    .build()
-                    .parseSignedClaims(refreshToken)
-                    .getPayload();
-            return Optional.of(Long.valueOf(claims.getSubject()));
-        } catch (ExpiredJwtException e) {
-            return Optional.of(Long.valueOf(e.getClaims().getSubject()));
-        } catch (JwtException | IllegalArgumentException e) {
-            return Optional.empty();
-        }
+    private RefreshTokenPayload toPayload(Claims claims) {
+        Long memberId = Long.valueOf(claims.getSubject());
+        String deviceId = claims.get(CLAIM_DEVICE_ID, String.class);
+        return new RefreshTokenPayload(memberId, deviceId);
     }
 
     public long getRefreshTokenExpirationMillis() {
