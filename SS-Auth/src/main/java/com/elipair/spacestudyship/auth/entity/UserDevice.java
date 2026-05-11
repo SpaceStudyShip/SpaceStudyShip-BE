@@ -40,31 +40,31 @@ public class UserDevice extends BaseTimeEntity {
     private String fcmToken;
 
     @Column(name = "refresh_token", nullable = false, length = 512)
-    private String refreshToken;
+    private String refreshTokenHash;
 
     @Column(name = "last_login_at", nullable = false)
     private LocalDateTime lastLoginAt;
 
     public static UserDevice register(Long memberId, String deviceId, DeviceType deviceType,
-                                      String fcmToken, String refreshToken) {
+                                      String fcmToken, String refreshTokenHash) {
         return UserDevice.builder()
                 .memberId(memberId)
                 .deviceId(deviceId)
                 .deviceType(deviceType)
                 .fcmToken(fcmToken)
-                .refreshToken(refreshToken)
+                .refreshTokenHash(refreshTokenHash)
                 .lastLoginAt(LocalDateTime.now())
                 .build();
     }
 
-    public void renewLogin(DeviceType deviceType, String fcmToken, String refreshToken) {
+    public void renewLogin(DeviceType deviceType, String fcmToken, String refreshTokenHash) {
         this.deviceType = deviceType;
         this.fcmToken = fcmToken;
-        this.refreshToken = refreshToken;
+        this.refreshTokenHash = refreshTokenHash;
         this.lastLoginAt = LocalDateTime.now();
     }
 
-    public void rotateRefreshToken(String refreshToken) {
-        this.refreshToken = refreshToken;
+    public void rotateRefreshTokenHash(String refreshTokenHash) {
+        this.refreshTokenHash = refreshTokenHash;
     }
 }

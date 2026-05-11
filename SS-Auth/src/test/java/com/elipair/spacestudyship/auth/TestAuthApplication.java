@@ -5,6 +5,7 @@ import org.springframework.boot.autoconfigure.ImportAutoConfiguration;
 import org.springframework.boot.data.jpa.autoconfigure.DataJpaRepositoriesAutoConfiguration;
 import org.springframework.boot.hibernate.autoconfigure.HibernateJpaAutoConfiguration;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration;
+import org.springframework.boot.jdbc.autoconfigure.JdbcTemplateAutoConfiguration;
 import org.springframework.boot.transaction.autoconfigure.TransactionAutoConfiguration;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
@@ -13,6 +14,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @AutoConfigurationPackage(basePackages = "com.elipair.spacestudyship")
 @ImportAutoConfiguration({
         DataSourceAutoConfiguration.class,
+        JdbcTemplateAutoConfiguration.class,
         HibernateJpaAutoConfiguration.class,
         TransactionAutoConfiguration.class,
         DataJpaRepositoriesAutoConfiguration.class

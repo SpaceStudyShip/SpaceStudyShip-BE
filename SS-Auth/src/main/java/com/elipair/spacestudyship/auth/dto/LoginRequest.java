@@ -5,6 +5,8 @@ import com.elipair.spacestudyship.member.constant.SocialType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 @Schema(description = "소셜 로그인 요청 본문")
 public record LoginRequest(
@@ -18,7 +20,8 @@ public record LoginRequest(
 
         @Schema(description = "Firebase Cloud Messaging 디바이스 토큰.",
                 example = "dK3mL9xRTp2...", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "FCM 토큰은 필수입니다.") String fcmToken,
+        @NotBlank(message = "FCM 토큰은 필수입니다.")
+        @Size(max = 255, message = "FCM 토큰은 255자 이하여야 합니다.") String fcmToken,
 
         @Schema(description = "디바이스 OS 타입.",
                 example = "IOS", requiredMode = Schema.RequiredMode.REQUIRED)
@@ -26,5 +29,7 @@ public record LoginRequest(
 
         @Schema(description = "디바이스 고유 식별자(UUID).",
                 example = "550e8400-e29b-41d4-a716-446655440000", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "디바이스 식별자는 필수입니다.") String deviceId
+        @NotBlank(message = "디바이스 식별자는 필수입니다.")
+        @Size(max = 255, message = "디바이스 식별자는 255자 이하여야 합니다.")
+        @Pattern(regexp = "^[0-9a-fA-F-]{36}$", message = "디바이스 식별자는 UUID 형식이어야 합니다.") String deviceId
 ) {}

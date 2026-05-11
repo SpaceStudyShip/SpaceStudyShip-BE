@@ -15,6 +15,7 @@ public enum ErrorCode {
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, "인증 정보가 올바르지 않습니다."),
     UNAUTHENTICATED_REQUEST(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."),
     UNSUPPORTED_SOCIAL_TYPE(HttpStatus.BAD_REQUEST, "지원하지 않는 소셜 로그인 방식입니다."),
+    DEVICE_LIMIT_EXCEEDED(HttpStatus.FORBIDDEN, "등록 가능한 디바이스 개수를 초과했습니다."),
     NICKNAME_GENERATION_FAILED(HttpStatus.INTERNAL_SERVER_ERROR, "랜덤 닉네임 생성에 실패했습니다."),
 
     // Member

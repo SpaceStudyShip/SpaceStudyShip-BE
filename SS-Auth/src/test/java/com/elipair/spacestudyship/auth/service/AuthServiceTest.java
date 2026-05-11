@@ -10,6 +10,7 @@ import com.elipair.spacestudyship.auth.dto.UpdateNicknameRequest;
 import com.elipair.spacestudyship.auth.dto.UpdateNicknameResponse;
 import com.elipair.spacestudyship.auth.entity.UserDevice;
 import com.elipair.spacestudyship.auth.jwt.JwtTokenProvider;
+import com.elipair.spacestudyship.auth.jwt.RefreshTokenHasher;
 import com.elipair.spacestudyship.auth.jwt.RefreshTokenPayload;
 import com.elipair.spacestudyship.auth.repository.UserDeviceRepository;
 import com.elipair.spacestudyship.auth.social.SocialLoginStrategy;
@@ -82,6 +83,7 @@ class AuthServiceTest {
         given(jwtTokenProvider.createRefreshToken(member, "device-1")).willReturn("refresh-1");
         given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "device-1"))
                 .willReturn(Optional.empty());
+        given(userDeviceRepository.countByMemberId(10L)).willReturn(0L);
 
         LoginResponse response = authService.login(request);
 
@@ -110,15 +112,71 @@ class AuthServiceTest {
         given(jwtTokenProvider.createAccessToken(member)).willReturn("access-NEW");
         given(jwtTokenProvider.createRefreshToken(member, "device-1")).willReturn("refresh-NEW");
 
-        UserDevice existing = UserDevice.register(10L, "device-1", DeviceType.ANDROID, "fcm-OLD", "refresh-OLD");
+        UserDevice existing = UserDevice.register(10L, "device-1", DeviceType.ANDROID, "fcm-OLD",
+                RefreshTokenHasher.hash("refresh-OLD"));
         given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "device-1"))
                 .willReturn(Optional.of(existing));
 
         authService.login(request);
 
         assertThat(existing.getFcmToken()).isEqualTo("fcm-NEW");
-        assertThat(existing.getRefreshToken()).isEqualTo("refresh-NEW");
+        assertThat(existing.getRefreshTokenHash()).isEqualTo(RefreshTokenHasher.hash("refresh-NEW"));
         assertThat(existing.getDeviceType()).isEqualTo(DeviceType.IOS);
+        then(userDeviceRepository).should(never()).save(any(UserDevice.class));
+    }
+
+    @Test
+    @DisplayName("login: 신규 디바이스이고 회원 디바이스 개수가 한도(10) 미만이면 등록 성공")
+    void login_newDevice_underLimit() {
+        SocialType socialType = SocialType.GOOGLE;
+        LoginRequest request = new LoginRequest(socialType, "id-token", "fcm-1", DeviceType.IOS, "device-1");
+
+        SocialLoginStrategy strategy = mock(SocialLoginStrategy.class);
+        given(socialLoginStrategies.get(socialType)).willReturn(strategy);
+        given(strategy.validateAndGetSocialId("id-token")).willReturn("social-id-1");
+
+        Member member = Member.builder()
+                .id(10L).socialId("social-id-1").socialType(socialType).nickname("기존회원").build();
+        given(memberRepository.findBySocialIdAndSocialType("social-id-1", socialType))
+                .willReturn(Optional.of(member));
+
+        given(jwtTokenProvider.createAccessToken(member)).willReturn("access-1");
+        given(jwtTokenProvider.createRefreshToken(member, "device-1")).willReturn("refresh-1");
+        given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "device-1"))
+                .willReturn(Optional.empty());
+        given(userDeviceRepository.countByMemberId(10L)).willReturn(9L);
+
+        authService.login(request);
+
+        then(userDeviceRepository).should().save(any(UserDevice.class));
+    }
+
+    @Test
+    @DisplayName("login: 신규 디바이스이고 회원 디바이스 개수가 한도(10) 이상이면 DEVICE_LIMIT_EXCEEDED")
+    void login_newDevice_overLimit() {
+        SocialType socialType = SocialType.GOOGLE;
+        LoginRequest request = new LoginRequest(socialType, "id-token", "fcm-1",
+                DeviceType.IOS, "550e8400-e29b-41d4-a716-446655440000");
+
+        SocialLoginStrategy strategy = mock(SocialLoginStrategy.class);
+        given(socialLoginStrategies.get(socialType)).willReturn(strategy);
+        given(strategy.validateAndGetSocialId("id-token")).willReturn("social-id-1");
+
+        Member member = Member.builder()
+                .id(10L).socialId("social-id-1").socialType(socialType).nickname("회원").build();
+        given(memberRepository.findBySocialIdAndSocialType("social-id-1", socialType))
+                .willReturn(Optional.of(member));
+
+        given(jwtTokenProvider.createAccessToken(member)).willReturn("access-1");
+        given(jwtTokenProvider.createRefreshToken(member, "550e8400-e29b-41d4-a716-446655440000"))
+                .willReturn("refresh-1");
+        given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "550e8400-e29b-41d4-a716-446655440000"))
+                .willReturn(Optional.empty());
+        given(userDeviceRepository.countByMemberId(10L)).willReturn(10L);
+
+        assertThatThrownBy(() -> authService.login(request))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.DEVICE_LIMIT_EXCEEDED);
         then(userDeviceRepository).should(never()).save(any(UserDevice.class));
     }
 
@@ -132,7 +190,8 @@ class AuthServiceTest {
 
         given(jwtTokenProvider.parseRefreshToken(oldRefresh))
                 .willReturn(new RefreshTokenPayload(10L, "device-1"));
-        UserDevice device = UserDevice.register(10L, "device-1", DeviceType.IOS, "fcm", oldRefresh);
+        UserDevice device = UserDevice.register(10L, "device-1", DeviceType.IOS, "fcm",
+                RefreshTokenHasher.hash(oldRefresh));
         given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "device-1"))
                 .willReturn(Optional.of(device));
         Member member = Member.builder()
@@ -145,7 +204,7 @@ class AuthServiceTest {
 
         assertThat(response.tokens().accessToken()).isEqualTo("access-NEW");
         assertThat(response.tokens().refreshToken()).isEqualTo("refresh-NEW");
-        assertThat(device.getRefreshToken()).isEqualTo("refresh-NEW");
+        assertThat(device.getRefreshTokenHash()).isEqualTo(RefreshTokenHasher.hash("refresh-NEW"));
     }
 
     @Test
@@ -156,7 +215,8 @@ class AuthServiceTest {
 
         given(jwtTokenProvider.parseRefreshToken(incomingRefresh))
                 .willReturn(new RefreshTokenPayload(10L, "device-1"));
-        UserDevice device = UserDevice.register(10L, "device-1", DeviceType.IOS, "fcm", "refresh-CURRENT");
+        UserDevice device = UserDevice.register(10L, "device-1", DeviceType.IOS, "fcm",
+                RefreshTokenHasher.hash("refresh-CURRENT"));
         given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "device-1"))
                 .willReturn(Optional.of(device));
 

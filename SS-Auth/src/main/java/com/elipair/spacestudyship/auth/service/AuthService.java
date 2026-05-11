@@ -3,6 +3,7 @@ package com.elipair.spacestudyship.auth.service;
 import com.elipair.spacestudyship.auth.dto.*;
 import com.elipair.spacestudyship.auth.entity.UserDevice;
 import com.elipair.spacestudyship.auth.jwt.JwtTokenProvider;
+import com.elipair.spacestudyship.auth.jwt.RefreshTokenHasher;
 import com.elipair.spacestudyship.auth.jwt.RefreshTokenPayload;
 import com.elipair.spacestudyship.auth.repository.UserDeviceRepository;
 import com.elipair.spacestudyship.auth.social.SocialLoginStrategy;
@@ -28,6 +29,7 @@ import java.util.Map;
 public class AuthService {
 
     private static final int MAXIMUM_NICKNAME_GENERATE_RETRY_COUNT = 10;
+    private static final int MAX_DEVICES_PER_MEMBER = 10;
 
     private final MemberRepository memberRepository;
     private final UserDeviceRepository userDeviceRepository;
@@ -50,20 +52,26 @@ public class AuthService {
 
         String accessToken = jwtTokenProvider.createAccessToken(member);
         String refreshToken = jwtTokenProvider.createRefreshToken(member, request.deviceId());
+        String refreshTokenHash = RefreshTokenHasher.hash(refreshToken);
 
-        upsertUserDevice(member.getId(), request, refreshToken);
+        upsertUserDevice(member.getId(), request, refreshTokenHash);
 
         return new LoginResponse(member.getId(), member.getNickname(),
                 new Tokens(accessToken, refreshToken), authMemberData.isNewMember());
     }
 
-    private void upsertUserDevice(Long memberId, LoginRequest request, String refreshToken) {
+    private void upsertUserDevice(Long memberId, LoginRequest request, String refreshTokenHash) {
         userDeviceRepository.findByMemberIdAndDeviceId(memberId, request.deviceId())
                 .ifPresentOrElse(
-                        device -> device.renewLogin(request.deviceType(), request.fcmToken(), refreshToken),
-                        () -> userDeviceRepository.save(UserDevice.register(
-                                memberId, request.deviceId(), request.deviceType(),
-                                request.fcmToken(), refreshToken))
+                        device -> device.renewLogin(request.deviceType(), request.fcmToken(), refreshTokenHash),
+                        () -> {
+                            if (userDeviceRepository.countByMemberId(memberId) >= MAX_DEVICES_PER_MEMBER) {
+                                throw new CustomException(ErrorCode.DEVICE_LIMIT_EXCEEDED);
+                            }
+                            userDeviceRepository.save(UserDevice.register(
+                                    memberId, request.deviceId(), request.deviceType(),
+                                    request.fcmToken(), refreshTokenHash));
+                        }
                 );
     }
 
@@ -115,7 +123,7 @@ public class AuthService {
                 .findByMemberIdAndDeviceId(payload.memberId(), payload.deviceId())
                 .orElseThrow(() -> new CustomException(ErrorCode.INVALID_TOKEN));
 
-        if (!device.getRefreshToken().equals(request.refreshToken())) {
+        if (!device.getRefreshTokenHash().equals(RefreshTokenHasher.hash(request.refreshToken()))) {
             userDeviceRepository.delete(device);
             log.warn("[Security] Refresh Token 불일치 - 강제 로그아웃 처리 | memberId={}, deviceId={}",
                     payload.memberId(), payload.deviceId());
@@ -126,7 +134,7 @@ public class AuthService {
         String newAccess = jwtTokenProvider.createAccessToken(member);
         String newRefresh = jwtTokenProvider.createRefreshToken(member, payload.deviceId());
 
-        device.rotateRefreshToken(newRefresh);
+        device.rotateRefreshTokenHash(RefreshTokenHasher.hash(newRefresh));
         return new ReissueResponse(new Tokens(newAccess, newRefresh));
     }
 
