@@ -211,4 +211,20 @@ class AuthServiceTest {
         verify(refreshTokenRepository).delete(memberId);
         verify(firebaseAuth).deleteUser(socialId);
     }
+
+    @Test
+    @DisplayName("withdraw: Member 이미 없으면 멱등 처리 (refresh token만 삭제 시도)")
+    void withdraw_alreadyWithdrawn() throws Exception {
+        // given
+        Long memberId = 1L;
+        given(memberRepository.findById(memberId)).willReturn(java.util.Optional.empty());
+
+        // when
+        authService.withdraw(memberId);
+
+        // then
+        verify(memberRepository, never()).delete(any(Member.class));
+        verify(refreshTokenRepository).delete(memberId);
+        verify(firebaseAuth, never()).deleteUser(any());
+    }
 }
