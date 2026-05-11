@@ -34,7 +34,7 @@ public class GlobalExceptionHandler {
         ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
-                .body(ErrorResponse.of(errorCode.getHttpStatus().value(), detail));
+                .body(ErrorResponse.of(errorCode, detail));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

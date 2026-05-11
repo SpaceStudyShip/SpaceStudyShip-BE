@@ -21,6 +21,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.willDoNothing;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -169,6 +171,27 @@ class AuthControllerTest {
         mockMvc.perform(patch("/api/auth/nickname")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(body)))
+                .andExpect(status().isUnauthorized());
+    }
+
+    // ========== DELETE /api/auth/withdraw ==========
+
+    @Test
+    @DisplayName("withdraw: 정상 요청이면 204 응답하고 AuthService.withdraw 호출")
+    void withdraw_success() throws Exception {
+        // given
+        willDoNothing().given(authService).withdraw(1L);
+
+        // when / then
+        mockMvc.perform(delete("/api/auth/withdraw")
+                        .requestAttr("loginMember", new LoginMember(1L)))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("withdraw: 인증 정보가 없으면 401")
+    void withdraw_unauthenticated() throws Exception {
+        mockMvc.perform(delete("/api/auth/withdraw"))
                 .andExpect(status().isUnauthorized());
     }
 }

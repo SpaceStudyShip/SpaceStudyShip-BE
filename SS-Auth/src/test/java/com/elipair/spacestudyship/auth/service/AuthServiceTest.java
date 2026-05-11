@@ -11,6 +11,9 @@ import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.member.constant.SocialType;
 import com.elipair.spacestudyship.member.entity.Member;
 import com.elipair.spacestudyship.member.repository.MemberRepository;
+import com.google.firebase.auth.AuthErrorCode;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.willThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -42,6 +46,8 @@ class AuthServiceTest {
     RandomNicknameGenerator randomNicknameGenerator;
     @Mock
     Map<SocialType, SocialLoginStrategy> socialLoginStrategies;
+    @Mock
+    FirebaseAuth firebaseAuth;
 
     @InjectMocks
     AuthService authService;
@@ -184,5 +190,99 @@ class AuthServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
         verify(memberRepository, never()).existsByNickname(any());
+    }
+
+    @Test
+    @DisplayName("withdraw: Member 존재 시 DB/Redis/Firebase 모두 삭제")
+    void withdraw_success() throws Exception {
+        // given
+        Long memberId = 1L;
+        String socialId = "firebase-uid-123";
+        Member member = Member.builder()
+                .id(memberId)
+                .socialId(socialId)
+                .socialType(SocialType.GOOGLE)
+                .nickname("탈퇴할회원")
+                .build();
+        given(memberRepository.findById(memberId)).willReturn(java.util.Optional.of(member));
+
+        // when
+        authService.withdraw(memberId);
+
+        // then
+        verify(memberRepository).delete(member);
+        verify(refreshTokenRepository).delete(memberId);
+        verify(firebaseAuth).deleteUser(socialId);
+    }
+
+    @Test
+    @DisplayName("withdraw: Member 이미 없으면 멱등 처리 (refresh token만 삭제 시도)")
+    void withdraw_alreadyWithdrawn() throws Exception {
+        // given
+        Long memberId = 1L;
+        given(memberRepository.findById(memberId)).willReturn(java.util.Optional.empty());
+
+        // when
+        authService.withdraw(memberId);
+
+        // then
+        verify(memberRepository, never()).delete(any(Member.class));
+        verify(refreshTokenRepository).delete(memberId);
+        verify(firebaseAuth, never()).deleteUser(any());
+    }
+
+    @Test
+    @DisplayName("withdraw: Firebase USER_NOT_FOUND 예외는 무시하고 정상 완료")
+    void withdraw_firebaseUserNotFound() throws Exception {
+        // given
+        Long memberId = 1L;
+        String socialId = "firebase-uid-123";
+        Member member = Member.builder()
+                .id(memberId)
+                .socialId(socialId)
+                .socialType(SocialType.GOOGLE)
+                .nickname("탈퇴할회원")
+                .build();
+        given(memberRepository.findById(memberId)).willReturn(java.util.Optional.of(member));
+
+        FirebaseAuthException firebaseEx = mock(FirebaseAuthException.class);
+        given(firebaseEx.getAuthErrorCode()).willReturn(AuthErrorCode.USER_NOT_FOUND);
+        willThrow(firebaseEx).given(firebaseAuth).deleteUser(socialId);
+
+        // when (예외 없이 정상 완료되어야 함)
+        authService.withdraw(memberId);
+
+        // then
+        verify(memberRepository).delete(member);
+        verify(refreshTokenRepository).delete(memberId);
+        verify(firebaseAuth).deleteUser(socialId);
+    }
+
+    @Test
+    @DisplayName("withdraw: Firebase 일반 오류도 무시하고 정상 완료 (멱등성 유지)")
+    void withdraw_firebaseGenericError() throws Exception {
+        // given
+        Long memberId = 1L;
+        String socialId = "firebase-uid-123";
+        Member member = Member.builder()
+                .id(memberId)
+                .socialId(socialId)
+                .socialType(SocialType.GOOGLE)
+                .nickname("탈퇴할회원")
+                .build();
+        given(memberRepository.findById(memberId)).willReturn(java.util.Optional.of(member));
+
+        FirebaseAuthException firebaseEx = mock(FirebaseAuthException.class);
+        given(firebaseEx.getAuthErrorCode()).willReturn(AuthErrorCode.CERTIFICATE_FETCH_FAILED);
+        given(firebaseEx.getMessage()).willReturn("Firebase 일시 장애");
+        willThrow(firebaseEx).given(firebaseAuth).deleteUser(socialId);
+
+        // when (예외 없이 정상 완료되어야 함)
+        authService.withdraw(memberId);
+
+        // then
+        verify(memberRepository).delete(member);
+        verify(refreshTokenRepository).delete(memberId);
+        verify(firebaseAuth).deleteUser(socialId);
     }
 }
