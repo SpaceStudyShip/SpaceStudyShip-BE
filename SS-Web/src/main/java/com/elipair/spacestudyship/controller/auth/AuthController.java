@@ -66,4 +66,11 @@ public class AuthController {
             @RequestBody @Valid UpdateNicknameRequest request) {
         return ResponseEntity.ok(authService.updateNickname(loginMember.memberId(), request));
     }
+
+    @Operation(summary = "회원 탈퇴")
+    @DeleteMapping("/withdraw")
+    public ResponseEntity<Void> withdraw(@AuthMember LoginMember loginMember) {
+        authService.withdraw(loginMember.memberId());
+        return ResponseEntity.noContent().build();
+    }
 }
