@@ -47,3 +47,7 @@ application-local.yml
 ### Claude Config (PAT 포함 민감 정보) ###
 .claude/config.json
 .report/
+
+### Firebase Admin SDK (민감 정보) ###
+**/firebase/*.json
+*-firebase-adminsdk-*.json
