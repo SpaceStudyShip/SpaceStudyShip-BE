@@ -11,6 +11,7 @@ import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.member.constant.SocialType;
 import com.elipair.spacestudyship.member.entity.Member;
 import com.elipair.spacestudyship.member.repository.MemberRepository;
+import com.google.firebase.auth.FirebaseAuth;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,8 @@ class AuthServiceTest {
     RandomNicknameGenerator randomNicknameGenerator;
     @Mock
     Map<SocialType, SocialLoginStrategy> socialLoginStrategies;
+    @Mock
+    FirebaseAuth firebaseAuth;
 
     @InjectMocks
     AuthService authService;
@@ -184,5 +187,28 @@ class AuthServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.MEMBER_NOT_FOUND);
         verify(memberRepository, never()).existsByNickname(any());
+    }
+
+    @Test
+    @DisplayName("withdraw: Member 존재 시 DB/Redis/Firebase 모두 삭제")
+    void withdraw_success() throws Exception {
+        // given
+        Long memberId = 1L;
+        String socialId = "firebase-uid-123";
+        Member member = Member.builder()
+                .id(memberId)
+                .socialId(socialId)
+                .socialType(SocialType.GOOGLE)
+                .nickname("탈퇴할회원")
+                .build();
+        given(memberRepository.findById(memberId)).willReturn(java.util.Optional.of(member));
+
+        // when
+        authService.withdraw(memberId);
+
+        // then
+        verify(memberRepository).delete(member);
+        verify(refreshTokenRepository).delete(memberId);
+        verify(firebaseAuth).deleteUser(socialId);
     }
 }

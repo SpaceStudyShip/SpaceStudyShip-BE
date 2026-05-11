@@ -9,6 +9,8 @@ import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.member.entity.Member;
 import com.elipair.spacestudyship.member.constant.SocialType;
 import com.elipair.spacestudyship.member.repository.MemberRepository;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -29,6 +31,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final RandomNicknameGenerator randomNicknameGenerator;
     private final Map<SocialType, SocialLoginStrategy> socialLoginStrategies;
+    private final FirebaseAuth firebaseAuth;
 
     /**
      * 소셜 로그인
@@ -154,6 +157,21 @@ public class AuthService {
             throw new CustomException(ErrorCode.DUPLICATED_NICKNAME);
         }
         return new UpdateNicknameResponse(member.getNickname());
+    }
+
+    /**
+     * 회원 탈퇴 - DB / Redis / Firebase 사용자 삭제
+     */
+    @Transactional
+    public void withdraw(Long memberId) throws FirebaseAuthException {
+        Member member = memberRepository.findById(memberId).orElse(null);
+        if (member != null) {
+            memberRepository.delete(member);
+        }
+        refreshTokenRepository.delete(memberId);
+        if (member != null) {
+            firebaseAuth.deleteUser(member.getSocialId());
+        }
     }
 
 }
