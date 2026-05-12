@@ -53,7 +53,7 @@ public class AuthController {
                     2. socialType + socialId 로 DB 조회
                        - 존재: 기존 회원 정보로 JWT 발급
                        - 없음: 신규 회원 생성 (랜덤 닉네임), JWT 발급
-                    3. Refresh Token 을 Redis 에 저장
+                    3. Refresh Token 해시를 user_devices 테이블에 저장 (디바이스별)
                     """
     )
     @ApiResponses({
@@ -193,7 +193,7 @@ public class AuthController {
                     3-b. 실패 (401 `INVALID_TOKEN`): 로그아웃 처리 + 로그인 화면 이동
 
                     ### 보안 정책
-                    - Refresh Token 이 Redis 의 저장값과 불일치하면 **탈취 의심**으로 간주, 해당 회원의 모든 세션을 즉시 무효화한 뒤 401 응답.
+                    - Refresh Token 해시가 DB의 저장 해시와 불일치하면 **탈취 의심**으로 간주, 해당 디바이스 세션을 즉시 무효화한 뒤 401 응답.
                     """
     )
     @ApiResponses({
@@ -235,7 +235,7 @@ public class AuthController {
             ),
             @ApiResponse(
                     responseCode = "401",
-                    description = "Refresh Token 이 만료되었거나, Redis 저장값과 불일치(탈취 의심)이거나, 변조된 경우. 클라이언트는 로그아웃 처리 후 로그인 화면으로 이동해야 합니다.",
+                    description = "Refresh Token 이 만료되었거나, DB의 저장 해시와 불일치(탈취 의심)이거나, 변조된 경우. 클라이언트는 로그아웃 처리 후 로그인 화면으로 이동해야 합니다.",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = ErrorResponse.class),
@@ -280,7 +280,7 @@ public class AuthController {
                     클라이언트는 응답 수신 후 로컬에 저장된 Access/Refresh Token 도 함께 삭제해야 합니다.
 
                     ### 인증 불필요 (실제 동작상)
-                    서버는 요청 본문의 `refreshToken` 에서 memberId 를 추출해 Redis 에서 해당 세션을 삭제합니다.
+                    서버는 요청 본문의 `refreshToken` 에서 memberId 를 추출해 user_devices 테이블의 (member_id, device_id) row를 삭제합니다.
                     Refresh Token 이 유효하지 않거나 이미 삭제된 경우에도 멱등하게 **204** 를 응답합니다.
 
                     ### 단일 디바이스 로그아웃
@@ -562,13 +562,12 @@ public class AuthController {
 
                     ### 삭제 대상
                     - `members` 테이블의 해당 회원 row
-                    - Redis 의 `refresh_token:{memberId}` 키 (모든 디바이스 세션 무효화)
+                    - `user_devices` 테이블의 해당 회원 row 전체 (FK CASCADE로 자동 삭제, 모든 디바이스 세션 무효화)
                     - Firebase Authentication 의 해당 사용자 (uid = 회원의 socialId)
 
                     ### 처리 순서
-                    1. 회원 row 삭제 (`@Transactional`)
-                    2. Redis refresh token 삭제
-                    3. Firebase Authentication 사용자 삭제
+                    1. 회원 row 삭제 (`@Transactional`) → FK CASCADE로 user_devices 자동 삭제
+                    2. Firebase Authentication 사용자 삭제
 
                     ### 멱등성
                     - 동일한 토큰으로 두 번 호출되거나, 다른 디바이스에서 먼저 탈퇴되어 회원이 이미 없는 상태에서 호출되어도 동일하게 **204**를 응답합니다.
