@@ -1,5 +1,6 @@
 package com.elipair.spacestudyship.auth.jwt;
 
+import com.elipair.spacestudyship.auth.dto.RefreshTokenPayloadDto;
 import com.elipair.spacestudyship.common.exception.CustomException;
 import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.member.entity.Member;
@@ -77,6 +78,9 @@ public class JwtTokenProvider {
     private static final String CLAIM_DEVICE_ID = "did";
 
     public String createRefreshToken(Member member, String deviceId) {
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
         Date now = new Date();
         Date expiration = new Date(now.getTime() + jwtProperties.refresh().expiration().toMillis());
 
@@ -89,7 +93,7 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    public RefreshTokenPayload parseRefreshToken(String refreshToken) {
+    public RefreshTokenPayloadDto parseRefreshToken(String refreshToken) {
         Claims claims = getRefreshClaims(refreshToken);
         return toPayload(claims);
     }
@@ -97,7 +101,7 @@ public class JwtTokenProvider {
     /**
      * 로그아웃 시 사용 - 만료된 토큰에서도 (memberId, deviceId) 추출 시도
      */
-    public Optional<RefreshTokenPayload> parseRefreshTokenSafely(String refreshToken) {
+    public Optional<RefreshTokenPayloadDto> parseRefreshTokenSafely(String refreshToken) {
         try {
             Claims claims = Jwts.parser()
                     .verifyWith(refreshKey)
@@ -106,8 +110,12 @@ public class JwtTokenProvider {
                     .getPayload();
             return Optional.of(toPayload(claims));
         } catch (ExpiredJwtException e) {
-            return Optional.of(toPayload(e.getClaims()));
-        } catch (JwtException | IllegalArgumentException e) {
+            try {
+                return Optional.of(toPayload(e.getClaims()));
+            } catch (CustomException ex) {
+                return Optional.empty();
+            }
+        } catch (CustomException | JwtException | IllegalArgumentException e) {
             return Optional.empty();
         }
     }
@@ -128,10 +136,13 @@ public class JwtTokenProvider {
         }
     }
 
-    private RefreshTokenPayload toPayload(Claims claims) {
+    private RefreshTokenPayloadDto toPayload(Claims claims) {
         Long memberId = Long.valueOf(claims.getSubject());
         String deviceId = claims.get(CLAIM_DEVICE_ID, String.class);
-        return new RefreshTokenPayload(memberId, deviceId);
+        if (deviceId == null || deviceId.isBlank()) {
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
+        return new RefreshTokenPayloadDto(memberId, deviceId);
     }
 
     public long getRefreshTokenExpirationMillis() {

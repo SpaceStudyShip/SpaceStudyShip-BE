@@ -9,9 +9,9 @@ import com.elipair.spacestudyship.auth.dto.ReissueResponse;
 import com.elipair.spacestudyship.auth.dto.UpdateNicknameRequest;
 import com.elipair.spacestudyship.auth.dto.UpdateNicknameResponse;
 import com.elipair.spacestudyship.auth.entity.UserDevice;
+import com.elipair.spacestudyship.auth.dto.RefreshTokenPayloadDto;
 import com.elipair.spacestudyship.auth.jwt.JwtTokenProvider;
 import com.elipair.spacestudyship.auth.jwt.RefreshTokenHasher;
-import com.elipair.spacestudyship.auth.jwt.RefreshTokenPayload;
 import com.elipair.spacestudyship.auth.repository.UserDeviceRepository;
 import com.elipair.spacestudyship.auth.social.SocialLoginStrategy;
 import com.elipair.spacestudyship.common.exception.CustomException;
@@ -83,6 +83,7 @@ class AuthServiceTest {
         given(jwtTokenProvider.createRefreshToken(member, "device-1")).willReturn("refresh-1");
         given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "device-1"))
                 .willReturn(Optional.empty());
+        given(memberRepository.findByIdForUpdate(10L)).willReturn(Optional.of(member));
         given(userDeviceRepository.countByMemberId(10L)).willReturn(0L);
 
         LoginResponse response = authService.login(request);
@@ -144,6 +145,7 @@ class AuthServiceTest {
         given(jwtTokenProvider.createRefreshToken(member, "device-1")).willReturn("refresh-1");
         given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "device-1"))
                 .willReturn(Optional.empty());
+        given(memberRepository.findByIdForUpdate(10L)).willReturn(Optional.of(member));
         given(userDeviceRepository.countByMemberId(10L)).willReturn(9L);
 
         authService.login(request);
@@ -172,6 +174,7 @@ class AuthServiceTest {
                 .willReturn("refresh-1");
         given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "550e8400-e29b-41d4-a716-446655440000"))
                 .willReturn(Optional.empty());
+        given(memberRepository.findByIdForUpdate(10L)).willReturn(Optional.of(member));
         given(userDeviceRepository.countByMemberId(10L)).willReturn(10L);
 
         assertThatThrownBy(() -> authService.login(request))
@@ -189,7 +192,7 @@ class AuthServiceTest {
         ReissueRequest request = new ReissueRequest(oldRefresh);
 
         given(jwtTokenProvider.parseRefreshToken(oldRefresh))
-                .willReturn(new RefreshTokenPayload(10L, "device-1"));
+                .willReturn(new RefreshTokenPayloadDto(10L, "device-1"));
         UserDevice device = UserDevice.register(10L, "device-1", DeviceType.IOS, "fcm",
                 RefreshTokenHasher.hash(oldRefresh));
         given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "device-1"))
@@ -214,7 +217,7 @@ class AuthServiceTest {
         ReissueRequest request = new ReissueRequest(incomingRefresh);
 
         given(jwtTokenProvider.parseRefreshToken(incomingRefresh))
-                .willReturn(new RefreshTokenPayload(10L, "device-1"));
+                .willReturn(new RefreshTokenPayloadDto(10L, "device-1"));
         UserDevice device = UserDevice.register(10L, "device-1", DeviceType.IOS, "fcm",
                 RefreshTokenHasher.hash("refresh-CURRENT"));
         given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "device-1"))
@@ -233,7 +236,7 @@ class AuthServiceTest {
         ReissueRequest request = new ReissueRequest(incoming);
 
         given(jwtTokenProvider.parseRefreshToken(incoming))
-                .willReturn(new RefreshTokenPayload(10L, "device-gone"));
+                .willReturn(new RefreshTokenPayloadDto(10L, "device-gone"));
         given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "device-gone"))
                 .willReturn(Optional.empty());
 
@@ -249,7 +252,7 @@ class AuthServiceTest {
     void logout_deletesOnlyTargetDevice() {
         String refreshToken = "refresh-1";
         given(jwtTokenProvider.parseRefreshTokenSafely(refreshToken))
-                .willReturn(Optional.of(new RefreshTokenPayload(10L, "device-1")));
+                .willReturn(Optional.of(new RefreshTokenPayloadDto(10L, "device-1")));
 
         authService.logout(refreshToken);
 

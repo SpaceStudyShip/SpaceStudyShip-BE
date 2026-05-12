@@ -114,6 +114,8 @@ class UserDeviceRepositoryTest {
         // H2 테스트 스키마에 ON DELETE CASCADE FK를 추가 (마이그레이션 SQL V0_0_31의 FK 검증)
         // @DirtiesContext: DDL은 트랜잭션 롤백 대상이 아니므로 컨텍스트를 재생성해 다른 테스트에 영향 없도록 함
         jdbcTemplate.execute(
+                "ALTER TABLE user_devices DROP CONSTRAINT IF EXISTS fk_user_devices_member_cascade");
+        jdbcTemplate.execute(
                 "ALTER TABLE user_devices ADD CONSTRAINT fk_user_devices_member_cascade " +
                 "FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE");
 

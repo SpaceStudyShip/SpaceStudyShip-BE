@@ -332,11 +332,11 @@ GET /api/auth/check-nickname?nickname=우주탐험가
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
 | `id` | BIGINT (PK) | |
-| `user_id` | BIGINT (FK → users) | 유저 ID |
+| `member_id` | BIGINT (FK → members) | 회원 ID |
 | `device_id` | VARCHAR(255) | 디바이스 UUID |
 | `device_type` | VARCHAR(10) | IOS / ANDROID |
 | `fcm_token` | VARCHAR(255) | FCM 토큰 |
-| `refresh_token` | VARCHAR(512) | Refresh Token |
+| `refresh_token` | VARCHAR(512) | Refresh Token (SHA-256 해시) |
 | `last_login_at` | TIMESTAMP | 마지막 로그인 |
 | `created_at` | TIMESTAMP | 생성 시각 |
 | `updated_at` | TIMESTAMP | 수정 시각 |

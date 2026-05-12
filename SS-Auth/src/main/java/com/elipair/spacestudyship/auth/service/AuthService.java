@@ -2,9 +2,9 @@ package com.elipair.spacestudyship.auth.service;
 
 import com.elipair.spacestudyship.auth.dto.*;
 import com.elipair.spacestudyship.auth.entity.UserDevice;
+import com.elipair.spacestudyship.auth.dto.RefreshTokenPayloadDto;
 import com.elipair.spacestudyship.auth.jwt.JwtTokenProvider;
 import com.elipair.spacestudyship.auth.jwt.RefreshTokenHasher;
-import com.elipair.spacestudyship.auth.jwt.RefreshTokenPayload;
 import com.elipair.spacestudyship.auth.repository.UserDeviceRepository;
 import com.elipair.spacestudyship.auth.social.SocialLoginStrategy;
 import com.elipair.spacestudyship.common.exception.CustomException;
@@ -64,15 +64,24 @@ public class AuthService {
         userDeviceRepository.findByMemberIdAndDeviceId(memberId, request.deviceId())
                 .ifPresentOrElse(
                         device -> device.renewLogin(request.deviceType(), request.fcmToken(), refreshTokenHash),
-                        () -> {
-                            if (userDeviceRepository.countByMemberId(memberId) >= MAX_DEVICES_PER_MEMBER) {
-                                throw new CustomException(ErrorCode.DEVICE_LIMIT_EXCEEDED);
-                            }
-                            userDeviceRepository.save(UserDevice.register(
-                                    memberId, request.deviceId(), request.deviceType(),
-                                    request.fcmToken(), refreshTokenHash));
-                        }
+                        () -> registerNewDevice(memberId, request, refreshTokenHash)
                 );
+    }
+
+    /**
+     * 신규 디바이스 등록은 회원 단위 pessimistic lock으로 직렬화하여
+     * 동시 로그인 시 디바이스 한도(MAX_DEVICES_PER_MEMBER) 초과를 방지한다.
+     */
+    private void registerNewDevice(Long memberId, LoginRequest request, String refreshTokenHash) {
+        memberRepository.findByIdForUpdate(memberId)
+                .orElseThrow(() -> new CustomException(ErrorCode.MEMBER_NOT_FOUND));
+
+        if (userDeviceRepository.countByMemberId(memberId) >= MAX_DEVICES_PER_MEMBER) {
+            throw new CustomException(ErrorCode.DEVICE_LIMIT_EXCEEDED);
+        }
+        userDeviceRepository.save(UserDevice.register(
+                memberId, request.deviceId(), request.deviceType(),
+                request.fcmToken(), refreshTokenHash));
     }
 
     private String getSocialId(SocialType socialType, String idToken) {
@@ -117,7 +126,7 @@ public class AuthService {
      */
     @Transactional
     public ReissueResponse reissue(ReissueRequest request) {
-        RefreshTokenPayload payload = jwtTokenProvider.parseRefreshToken(request.refreshToken());
+        RefreshTokenPayloadDto payload = jwtTokenProvider.parseRefreshToken(request.refreshToken());
 
         UserDevice device = userDeviceRepository
                 .findByMemberIdAndDeviceId(payload.memberId(), payload.deviceId())

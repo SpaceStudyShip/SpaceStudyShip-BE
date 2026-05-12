@@ -1,5 +1,6 @@
 package com.elipair.spacestudyship.auth.jwt;
 
+import com.elipair.spacestudyship.auth.dto.RefreshTokenPayloadDto;
 import com.elipair.spacestudyship.common.exception.CustomException;
 import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.member.constant.SocialType;
@@ -46,7 +47,7 @@ class JwtTokenProviderTest {
     void createAndParseRefreshToken() {
         String deviceId = "device-uuid-123";
         String token = jwtTokenProvider.createRefreshToken(member, deviceId);
-        RefreshTokenPayload payload = jwtTokenProvider.parseRefreshToken(token);
+        RefreshTokenPayloadDto payload = jwtTokenProvider.parseRefreshToken(token);
 
         assertThat(payload.memberId()).isEqualTo(42L);
         assertThat(payload.deviceId()).isEqualTo(deviceId);
@@ -65,7 +66,7 @@ class JwtTokenProviderTest {
     void parseRefreshTokenSafely_valid() {
         String token = jwtTokenProvider.createRefreshToken(member, "device-1");
 
-        Optional<RefreshTokenPayload> result = jwtTokenProvider.parseRefreshTokenSafely(token);
+        Optional<RefreshTokenPayloadDto> result = jwtTokenProvider.parseRefreshTokenSafely(token);
 
         assertThat(result).isPresent();
         assertThat(result.get().memberId()).isEqualTo(42L);
@@ -75,7 +76,7 @@ class JwtTokenProviderTest {
     @Test
     @DisplayName("parseRefreshTokenSafely: 위변조 토큰 → Optional.empty")
     void parseRefreshTokenSafely_invalid() {
-        Optional<RefreshTokenPayload> result = jwtTokenProvider.parseRefreshTokenSafely("garbage");
+        Optional<RefreshTokenPayloadDto> result = jwtTokenProvider.parseRefreshTokenSafely("garbage");
         assertThat(result).isEmpty();
     }
 

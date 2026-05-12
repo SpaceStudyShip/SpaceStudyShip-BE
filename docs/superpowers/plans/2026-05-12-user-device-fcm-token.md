@@ -11,7 +11,8 @@
 **Spec:** [docs/superpowers/specs/2026-05-12-user-device-fcm-token-design.md](../specs/2026-05-12-user-device-fcm-token-design.md)
 
 **커밋 메시지 컨벤션 (CLAUDE.md):**
-`디바이스_FCM토큰_저장_기능_추가 : {type} : {설명}` 형식. 각 Task의 커밋 예시는 그 형식을 따른다.
+`{이슈제목} : {type} : {변경사항 설명} {이슈URL}` 형식. `type`은 feat, fix, refactor, docs, chore, test, style 중 하나. 이모지/특수기호 금지.
+예: `디바이스 정보 및 FCM 토큰 저장 기능 추가 : feat : UserDevice Entity 추가 https://github.com/SpaceStudyShip/SpaceStudyShip-BE/issues/23`
 
 ---
 
@@ -1037,7 +1038,7 @@ git commit -m "디바이스_FCM토큰_저장_기능_추가 : feat : login/reissu
 
 - [ ] **Step 1: 호출처 0건 확인 (이미 모두 교체되었는지)**
 
-Run: `grep -r "RefreshTokenRepository" /Users/luca/workspace/Java_Spring/space_study_ship --include="*.java"`
+Run: `grep -rn "RefreshTokenRepository" . --include="*.java"`
 Expected: 단 한 줄도 출력되지 않음 (파일 자체 외에는). 만약 잔여 호출이 있으면 그 파일을 먼저 정리.
 
 - [ ] **Step 2: 파일 삭제**
@@ -1086,9 +1087,11 @@ git commit -m "디바이스_FCM토큰_저장_기능_추가 : refactor : RefreshT
 - [ ] **Step 2: "서버 처리 로직" 문구 보정 (디바이스별 Refresh Token 명시)**
 
 기존:
-```
+
+```text
 5. Refresh Token을 DB에 저장 (디바이스별)
 ```
+
 → 그대로 유지. 이제 실제 구현이 일치함.
 
 - [ ] **Step 3: `user_devices` DB 참고 표 — `created_at`, `updated_at` 컬럼 추가 (실제 스키마와 일치)**
@@ -1123,10 +1126,10 @@ Expected: BUILD SUCCESSFUL. 모든 테스트 통과.
 
 - [ ] **Step 2: 컴파일 잔여 import / 미사용 클래스 검색**
 
-Run: `grep -rn "refreshTokenRepository\|RefreshTokenRepository" /Users/luca/workspace/Java_Spring/space_study_ship --include="*.java"`
+Run: `grep -rn "refreshTokenRepository\|RefreshTokenRepository" . --include="*.java"`
 Expected: 출력 없음.
 
-Run: `grep -rn "getMemberIdFromRefreshToken" /Users/luca/workspace/Java_Spring/space_study_ship --include="*.java"`
+Run: `grep -rn "getMemberIdFromRefreshToken" . --include="*.java"`
 Expected: 출력 없음.
 
 - [ ] **Step 3: 마이그레이션 파일 한 개인지 확인 (CLAUDE.md 규칙: 한 version당 한 파일)**
