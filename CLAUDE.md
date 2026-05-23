@@ -222,6 +222,7 @@ log.warn("[Action] 경고 설명");
 | 버전 | 파일 | 내용 |
 |------|------|------|
 | 0.0.31 | `V0_0_31__add_user_devices.sql` | 초기 스키마 — `members`, `user_devices` 테이블 생성 (FK 포함) |
+| 0.0.34 | `V0_0_34__add_todos_and_categories.sql` | `todos`, `todo_categories` 테이블 생성 (FK CASCADE, JSONB 컬럼) |
 
 ---
 
