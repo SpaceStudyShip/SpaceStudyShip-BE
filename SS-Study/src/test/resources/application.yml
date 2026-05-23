@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    # JdbcDatabaseDelegate가 Testcontainers JDBC URL을 동적으로 처리
+    url: jdbc:tc:postgresql:16:///studytest
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+  flyway:
+    enabled: false
