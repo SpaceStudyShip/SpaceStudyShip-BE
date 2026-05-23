@@ -102,10 +102,10 @@ public class TodoService {
 
     @Transactional
     public void delete(Long userId, String todoId) {
-        if (!todoRepository.existsByIdAndUserId(todoId, userId)) {
+        long deleted = todoRepository.deleteByIdAndUserId(todoId, userId);
+        if (deleted == 0) {
             throw new CustomException(ErrorCode.TODO_NOT_FOUND);
         }
-        todoRepository.deleteById(todoId);
         log.info("[Todo] 삭제 | userId={}, todoId={}", userId, todoId);
     }
 }

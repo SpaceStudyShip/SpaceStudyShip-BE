@@ -1,6 +1,6 @@
 # 할 일 + 카테고리 도메인 설계 (이슈 #24)
 
-> **이슈**: [#24 [기능추가][할일] 할일 및 카테고리 도메인 구현](https://github.com/SpaceStudyShip/SpaceStudyShip-BE/issues/24)
+> **이슈**: [할일 및 카테고리 도메인 구현 #24](https://github.com/SpaceStudyShip/SpaceStudyShip-BE/issues/24)
 > **브랜치**: `20260422_#24_할일_및_카테고리_도메인_구현`
 > **버전**: version.yml `0.0.33` → `0.0.34`
 > **마이그레이션**: `V0_0_34__add_todos_and_categories.sql`
@@ -16,7 +16,7 @@ API 스펙 8개 엔드포인트(Todo CRUD 4 + Category CRUD 4)를 구현한다. 
 - Todo, TodoCategory Entity / Repository / Service
 - TodoController, TodoCategoryController (SS-Web)
 - Swagger 문서 (AuthController 수준 풀세트)
-- ErrorCode 7개 추가, 일관된 ErrorResponse 응답
+- ErrorCode 4개 추가 (Todo/Category × NotFound/AlreadyExists), 일관된 ErrorResponse 응답
 - Flyway 마이그레이션 (`V0_0_34`) + version.yml bump
 - 단위/통합 테스트 (Service / Repository / Controller)
 
@@ -31,7 +31,7 @@ API 스펙 8개 엔드포인트(Todo CRUD 4 + Category CRUD 4)를 구현한다. 
 
 기존 빈 `SS-Study` 모듈에 `todo` 패키지로 배치. SS-Study는 향후 Timer까지 포함하는 "학습" 도메인 통합 모듈로 확장될 예정.
 
-```
+```text
 SS-Study/src/main/java/com/elipair/spacestudyship/study/
 └── todo/
     ├── dto/

@@ -33,4 +33,6 @@ public interface TodoRepository extends JpaRepository<Todo, String> {
     boolean existsByIdAndUserId(String id, Long userId);
 
     Optional<Todo> findByIdAndUserId(String id, Long userId);
+
+    long deleteByIdAndUserId(String id, Long userId);
 }

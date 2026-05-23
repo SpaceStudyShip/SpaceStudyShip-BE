@@ -94,7 +94,7 @@ public class Todo extends BaseTimeEntity {
 
     public void removeCategoryId(String categoryId) {
         this.categoryIds = this.categoryIds.stream()
-                .filter(id -> !id.equals(categoryId))
+                .filter(id -> !java.util.Objects.equals(id, categoryId))
                 .collect(Collectors.toCollection(ArrayList::new));
     }
 }

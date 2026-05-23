@@ -188,19 +188,19 @@ class TodoServiceTest {
     }
 
     @Test
-    @DisplayName("delete: 본인 Todo 삭제 성공")
+    @DisplayName("delete: 본인 Todo 삭제 성공 (deleteByIdAndUserId atomic)")
     void delete_success() {
-        when(todoRepository.existsByIdAndUserId("t1", 1L)).thenReturn(true);
+        when(todoRepository.deleteByIdAndUserId("t1", 1L)).thenReturn(1L);
 
         todoService.delete(1L, "t1");
 
-        verify(todoRepository).deleteById("t1");
+        verify(todoRepository).deleteByIdAndUserId("t1", 1L);
     }
 
     @Test
-    @DisplayName("delete: 존재하지 않으면 TODO_NOT_FOUND")
+    @DisplayName("delete: deleted count 0이면 TODO_NOT_FOUND")
     void delete_notFound() {
-        when(todoRepository.existsByIdAndUserId("missing", 1L)).thenReturn(false);
+        when(todoRepository.deleteByIdAndUserId("missing", 1L)).thenReturn(0L);
 
         org.assertj.core.api.Assertions.assertThatThrownBy(() -> todoService.delete(1L, "missing"))
                 .isInstanceOf(com.elipair.spacestudyship.common.exception.CustomException.class)

@@ -3,6 +3,7 @@ package com.elipair.spacestudyship.study.todo.dto;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
@@ -20,13 +21,13 @@ public record TodoCreateRequest(
         String title,
 
         @Schema(description = "카테고리 ID 목록 (기본 [])", example = "[\"cat-uuid-1\"]")
-        List<String> categoryIds,
+        List<@Pattern(regexp = "[a-zA-Z0-9-]+", message = "categoryIds: 영숫자와 하이픈만 허용합니다.") String> categoryIds,
 
         @Schema(description = "예상 소요 시간(분, 1 이상)", nullable = true, example = "60")
         @Min(1)
         Integer estimatedMinutes,
 
         @Schema(description = "예정 날짜 목록 (YYYY-MM-DD)", example = "[\"2026-04-16\"]")
-        List<String> scheduledDates
+        List<@Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}", message = "scheduledDates: YYYY-MM-DD 형식이어야 합니다.") String> scheduledDates
 ) {
 }

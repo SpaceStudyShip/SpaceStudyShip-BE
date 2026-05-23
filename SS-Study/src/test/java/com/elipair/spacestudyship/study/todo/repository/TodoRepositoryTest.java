@@ -21,24 +21,28 @@ class TodoRepositoryTest {
     TodoRepository todoRepository;
 
     @Test
-    @DisplayName("findByUserIdOrderByCreatedAtDesc: 본인 Todo만, 최신순 반환")
-    void findByUserId_ordered() {
-        todoRepository.save(Todo.create("t1", 1L, "첫번째", null, null, null));
-        todoRepository.save(Todo.create("t2", 1L, "두번째", null, null, null));
-        todoRepository.save(Todo.create("t3", 2L, "다른유저", null, null, null));
+    @DisplayName("findByUserIdOrderByCreatedAtDesc: 본인 Todo만, 최신순 반환 (id 순서까지 검증)")
+    void findByUserId_ordered() throws InterruptedException {
+        todoRepository.saveAndFlush(Todo.create("t1", 1L, "첫번째", null, null, null));
+        Thread.sleep(5);
+        todoRepository.saveAndFlush(Todo.create("t2", 1L, "두번째", null, null, null));
+        todoRepository.saveAndFlush(Todo.create("t3", 2L, "다른유저", null, null, null));
 
         List<Todo> result = todoRepository.findByUserIdOrderByCreatedAtDesc(1L);
 
         assertThat(result).hasSize(2);
         assertThat(result).extracting("userId").containsOnly(1L);
+        assertThat(result).extracting("id").containsExactly("t2", "t1");
     }
 
     @Test
-    @DisplayName("findByUserIdAndScheduledDate: JSONB @> 연산자로 날짜 포함 Todo 필터")
+    @DisplayName("findByUserIdAndScheduledDate: JSONB @> 필터 + 타 사용자 격리")
     void findByUserIdAndScheduledDate() {
         todoRepository.save(Todo.create("t1", 1L, "월요일", List.of("2026-04-16"), null, null));
         todoRepository.save(Todo.create("t2", 1L, "양일", List.of("2026-04-16", "2026-04-17"), null, null));
         todoRepository.save(Todo.create("t3", 1L, "다른날", List.of("2026-04-18"), null, null));
+        // 타 사용자의 같은 날짜 Todo — user_id 조건 누락 회귀 방지
+        todoRepository.save(Todo.create("t4", 2L, "다른유저_같은날", List.of("2026-04-16"), null, null));
 
         List<Todo> result = todoRepository
                 .findByUserIdAndScheduledDate(1L, "\"2026-04-16\"");
@@ -47,11 +51,13 @@ class TodoRepositoryTest {
     }
 
     @Test
-    @DisplayName("findByUserIdAndCategoryId: JSONB @> 연산자로 카테고리 포함 Todo 필터")
+    @DisplayName("findByUserIdAndCategoryId: JSONB @> 필터 + 타 사용자 격리")
     void findByUserIdAndCategoryId() {
         todoRepository.save(Todo.create("t1", 1L, "수학", null, List.of("c-math"), null));
         todoRepository.save(Todo.create("t2", 1L, "복합", null, List.of("c-math", "c-eng"), null));
         todoRepository.save(Todo.create("t3", 1L, "영어만", null, List.of("c-eng"), null));
+        // 타 사용자의 같은 카테고리 Todo — user_id 조건 누락 회귀 방지
+        todoRepository.save(Todo.create("t4", 2L, "다른유저_같은카테고리", null, List.of("c-math"), null));
 
         List<Todo> result = todoRepository
                 .findByUserIdAndCategoryId(1L, "\"c-math\"");
