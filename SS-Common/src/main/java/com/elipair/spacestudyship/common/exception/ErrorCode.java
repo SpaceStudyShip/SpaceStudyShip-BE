@@ -30,6 +30,10 @@ public enum ErrorCode {
     CATEGORY_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 카테고리를 찾을 수 없습니다."),
     CATEGORY_ALREADY_EXISTS(HttpStatus.CONFLICT, "동일 ID의 카테고리가 이미 존재합니다."),
 
+    // Fuel
+    INSUFFICIENT_FUEL(HttpStatus.BAD_REQUEST, "연료가 부족합니다."),
+    FUEL_NOT_INITIALIZED(HttpStatus.INTERNAL_SERVER_ERROR, "연료 정보가 초기화되지 않았습니다."),
+
     // Common
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "입력값이 유효하지 않습니다."),
     INVALID_REQUEST_BODY(HttpStatus.BAD_REQUEST, "요청 본문의 형식이 잘못되었습니다."),
