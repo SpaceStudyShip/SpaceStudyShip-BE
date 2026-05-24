@@ -200,7 +200,7 @@ GET /api/fuel/transactions?type=consume&startDate=2026-04-01&endDate=2026-04-16
 | `total_charged` | INTEGER | 누적 충전량 |
 | `total_consumed` | INTEGER | 누적 소비량 |
 | `pending_minutes` | INTEGER | 미동기화 시간 |
-| `last_updated_at` | TIMESTAMP | 마지막 변동 시각 |
+| `updated_at` | TIMESTAMP | 마지막 변동 시각 (BaseTimeEntity.updatedAt) |
 
 ### fuel_transactions
 

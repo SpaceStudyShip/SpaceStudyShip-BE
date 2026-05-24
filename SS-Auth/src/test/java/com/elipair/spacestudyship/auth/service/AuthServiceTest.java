@@ -18,6 +18,7 @@ import com.elipair.spacestudyship.common.exception.CustomException;
 import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.member.constant.SocialType;
 import com.elipair.spacestudyship.member.entity.Member;
+import com.elipair.spacestudyship.member.event.MemberCreatedEvent;
 import com.elipair.spacestudyship.member.repository.MemberRepository;
 import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
@@ -25,10 +26,13 @@ import com.google.firebase.auth.FirebaseAuthException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.Map;
 import java.util.Optional;
@@ -58,6 +62,8 @@ class AuthServiceTest {
     Map<SocialType, SocialLoginStrategy> socialLoginStrategies;
     @Mock
     FirebaseAuth firebaseAuth;
+    @Mock
+    ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     AuthService authService;
@@ -181,6 +187,68 @@ class AuthServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.DEVICE_LIMIT_EXCEEDED);
         then(userDeviceRepository).should(never()).save(any(UserDevice.class));
+    }
+
+    @Test
+    @DisplayName("신규 회원 로그인 시 MemberCreatedEvent를 publish한다")
+    void login_newMember_publishesMemberCreatedEvent() {
+        SocialType socialType = SocialType.GOOGLE;
+        LoginRequest request = new LoginRequest(socialType, "id-token", "fcm-1", DeviceType.IOS, "device-1");
+
+        SocialLoginStrategy strategy = mock(SocialLoginStrategy.class);
+        given(socialLoginStrategies.get(socialType)).willReturn(strategy);
+        given(strategy.validateAndGetSocialId("id-token")).willReturn("social-id-new");
+
+        given(memberRepository.findBySocialIdAndSocialType("social-id-new", socialType))
+                .willReturn(Optional.empty());
+        given(randomNicknameGenerator.generate()).willReturn("우주탐험가");
+        given(memberRepository.existsByNickname("우주탐험가")).willReturn(false);
+        given(memberRepository.save(any(Member.class))).willAnswer(inv -> {
+            Member m = inv.getArgument(0);
+            ReflectionTestUtils.setField(m, "id", 20L);
+            return m;
+        });
+
+        given(jwtTokenProvider.createAccessToken(any(Member.class))).willReturn("access-new");
+        given(jwtTokenProvider.createRefreshToken(any(Member.class), any())).willReturn("refresh-new");
+        given(userDeviceRepository.findByMemberIdAndDeviceId(20L, "device-1"))
+                .willReturn(Optional.empty());
+        given(memberRepository.findByIdForUpdate(20L)).willReturn(Optional.of(
+                Member.builder().id(20L).socialId("social-id-new").socialType(socialType).nickname("우주탐험가").build()));
+        given(userDeviceRepository.countByMemberId(20L)).willReturn(0L);
+
+        authService.login(request);
+
+        ArgumentCaptor<MemberCreatedEvent> captor = ArgumentCaptor.forClass(MemberCreatedEvent.class);
+        verify(eventPublisher).publishEvent(captor.capture());
+        assertThat(captor.getValue().memberId()).isEqualTo(20L);
+    }
+
+    @Test
+    @DisplayName("기존 회원 재로그인 시 MemberCreatedEvent를 publish 하지 않는다")
+    void login_existingMember_doesNotPublishEvent() {
+        SocialType socialType = SocialType.GOOGLE;
+        LoginRequest request = new LoginRequest(socialType, "id-token", "fcm-1", DeviceType.IOS, "device-1");
+
+        SocialLoginStrategy strategy = mock(SocialLoginStrategy.class);
+        given(socialLoginStrategies.get(socialType)).willReturn(strategy);
+        given(strategy.validateAndGetSocialId("id-token")).willReturn("social-id-1");
+
+        Member member = Member.builder()
+                .id(10L).socialId("social-id-1").socialType(socialType).nickname("기존회원").build();
+        given(memberRepository.findBySocialIdAndSocialType("social-id-1", socialType))
+                .willReturn(Optional.of(member));
+
+        given(jwtTokenProvider.createAccessToken(member)).willReturn("access-1");
+        given(jwtTokenProvider.createRefreshToken(member, "device-1")).willReturn("refresh-1");
+        given(userDeviceRepository.findByMemberIdAndDeviceId(10L, "device-1"))
+                .willReturn(Optional.empty());
+        given(memberRepository.findByIdForUpdate(10L)).willReturn(Optional.of(member));
+        given(userDeviceRepository.countByMemberId(10L)).willReturn(0L);
+
+        authService.login(request);
+
+        verify(eventPublisher, never()).publishEvent(any(MemberCreatedEvent.class));
     }
 
     // ===== reissue =====
