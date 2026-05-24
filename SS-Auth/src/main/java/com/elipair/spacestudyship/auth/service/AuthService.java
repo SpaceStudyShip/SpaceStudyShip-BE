@@ -11,12 +11,14 @@ import com.elipair.spacestudyship.common.exception.CustomException;
 import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.member.entity.Member;
 import com.elipair.spacestudyship.member.constant.SocialType;
+import com.elipair.spacestudyship.member.event.MemberCreatedEvent;
 import com.elipair.spacestudyship.member.repository.MemberRepository;
 import com.google.firebase.auth.AuthErrorCode;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,7 @@ public class AuthService {
     private final RandomNicknameGenerator randomNicknameGenerator;
     private final Map<SocialType, SocialLoginStrategy> socialLoginStrategies;
     private final FirebaseAuth firebaseAuth;
+    private final ApplicationEventPublisher eventPublisher;
 
     /**
      * 소셜 로그인
@@ -99,6 +102,7 @@ public class AuthService {
                     String nickname = generateUniqueNickname();
                     Member newMember = Member.signUp(socialId, socialType, nickname);
                     memberRepository.save(newMember);
+                    eventPublisher.publishEvent(new MemberCreatedEvent(newMember.getId()));
 
                     log.info("[SignUp] 신규 회원가입 성공 | memberId={}, nickname={}, socialType={}",
                             newMember.getId(), nickname, socialType);
