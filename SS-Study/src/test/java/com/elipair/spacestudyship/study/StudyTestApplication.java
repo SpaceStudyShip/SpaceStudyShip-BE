@@ -19,6 +19,9 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
         TransactionAutoConfiguration.class,
         DataJpaRepositoriesAutoConfiguration.class
 })
-@EnableJpaRepositories(basePackages = "com.elipair.spacestudyship.study.todo.repository")
+@EnableJpaRepositories(basePackages = {
+        "com.elipair.spacestudyship.study.todo.repository",
+        "com.elipair.spacestudyship.study.fuel.repository"
+})
 public class StudyTestApplication {
 }
