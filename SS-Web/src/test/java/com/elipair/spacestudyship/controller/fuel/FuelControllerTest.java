@@ -114,14 +114,16 @@ class FuelControllerTest {
     @DisplayName("GET /api/fuel/transactions?size=200 → 400 (Max 100)")
     void getTransactions_sizeOverMax_400() throws Exception {
         mockMvc.perform(get("/api/fuel/transactions?size=200"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
     }
 
     @Test
     @DisplayName("GET /api/fuel/transactions?page=-1 → 400 (Min 0)")
     void getTransactions_negativePage_400() throws Exception {
         mockMvc.perform(get("/api/fuel/transactions?page=-1"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT_VALUE"));
     }
 
     @Test

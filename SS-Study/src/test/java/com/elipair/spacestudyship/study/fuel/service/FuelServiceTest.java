@@ -319,6 +319,11 @@ class FuelServiceTest {
                 1L, 0, FuelReason.EXPLORATION_UNLOCK, "region-1", "tx-1"))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+        assertThatThrownBy(() -> fuelService.consume(
+                1L, -10, FuelReason.EXPLORATION_UNLOCK, "region-1", "tx-1"))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
     }
 
     @Test

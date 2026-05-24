@@ -67,16 +67,18 @@ public class FuelService {
 
         Optional<FuelTransaction> existing = transactionRepository.findById(transactionId);
         if (existing.isPresent()) {
-            FuelTransaction tx = existing.get();
-            if (!tx.getUserId().equals(userId)) {
-                throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-            }
-            log.info("[Fuel] charge idempotent skip | userId={}, txId={}", userId, transactionId);
-            return FuelTransactionResponse.from(tx);
+            return idempotentReturn(existing.get(), userId, "charge", transactionId);
         }
 
         UserFuel fuel = userFuelRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FUEL_NOT_INITIALIZED));
+
+        // 락 획득 사이에 다른 트랜잭션이 동일 transactionId로 먼저 save한 경우의 경쟁 조건 방어
+        Optional<FuelTransaction> raced = transactionRepository.findById(transactionId);
+        if (raced.isPresent()) {
+            return idempotentReturn(raced.get(), userId, "charge", transactionId);
+        }
+
         fuel.charge(amount);
 
         FuelTransaction tx = FuelTransaction.of(
@@ -89,6 +91,15 @@ public class FuelService {
         return FuelTransactionResponse.from(tx);
     }
 
+    private FuelTransactionResponse idempotentReturn(FuelTransaction tx, Long userId,
+                                                     String action, String transactionId) {
+        if (!tx.getUserId().equals(userId)) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        log.info("[Fuel] {} idempotent skip | userId={}, txId={}", action, userId, transactionId);
+        return FuelTransactionResponse.from(tx);
+    }
+
     @Transactional
     public FuelTransactionResponse consume(
             Long userId, int amount, FuelReason reason,
@@ -98,16 +109,17 @@ public class FuelService {
 
         Optional<FuelTransaction> existing = transactionRepository.findById(transactionId);
         if (existing.isPresent()) {
-            FuelTransaction tx = existing.get();
-            if (!tx.getUserId().equals(userId)) {
-                throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
-            }
-            log.info("[Fuel] consume idempotent skip | userId={}, txId={}", userId, transactionId);
-            return FuelTransactionResponse.from(tx);
+            return idempotentReturn(existing.get(), userId, "consume", transactionId);
         }
 
         UserFuel fuel = userFuelRepository.findByUserIdForUpdate(userId)
                 .orElseThrow(() -> new CustomException(ErrorCode.FUEL_NOT_INITIALIZED));
+
+        Optional<FuelTransaction> raced = transactionRepository.findById(transactionId);
+        if (raced.isPresent()) {
+            return idempotentReturn(raced.get(), userId, "consume", transactionId);
+        }
+
         fuel.consume(amount);
 
         FuelTransaction tx = FuelTransaction.of(
