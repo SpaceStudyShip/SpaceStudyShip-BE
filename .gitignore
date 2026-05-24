@@ -52,3 +52,6 @@ application-local.yml
 ### Firebase Admin SDK (민감 정보) ###
 **/firebase/*.json
 *-firebase-adminsdk-*.json
+
+### 이슈/PR 로컬 템플릿 산출물 ###
+docs/suh-template/
