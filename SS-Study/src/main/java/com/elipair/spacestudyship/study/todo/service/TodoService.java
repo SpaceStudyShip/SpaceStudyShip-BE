@@ -7,6 +7,7 @@ import com.elipair.spacestudyship.study.todo.dto.TodoResponse;
 import com.elipair.spacestudyship.study.todo.entity.Todo;
 import com.elipair.spacestudyship.study.todo.repository.TodoCategoryRepository;
 import com.elipair.spacestudyship.study.todo.repository.TodoRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,7 @@ public class TodoService {
 
     private final TodoRepository todoRepository;
     private final TodoCategoryRepository categoryRepository;
+    private final EntityManager entityManager;
 
     public List<TodoResponse> findAll(Long userId, String date, String categoryId) {
         List<Todo> todos;
@@ -67,6 +69,7 @@ public class TodoService {
                 request.categoryIds(),
                 request.estimatedMinutes());
         Todo saved = todoRepository.save(todo);
+        entityManager.flush();
         log.info("[Todo] 생성 | userId={}, todoId={}", userId, saved.getId());
         return TodoResponse.from(saved);
     }
@@ -96,6 +99,7 @@ public class TodoService {
         if (request.estimatedMinutes() != null) todo.updateEstimatedMinutes(request.estimatedMinutes());
         if (request.actualMinutes() != null) todo.updateActualMinutes(request.actualMinutes());
 
+        entityManager.flush();
         log.info("[Todo] 수정 | userId={}, todoId={}", userId, todoId);
         return TodoResponse.from(todo);
     }
