@@ -3,6 +3,7 @@ package com.elipair.spacestudyship.study.todo.service;
 import com.elipair.spacestudyship.study.todo.entity.Todo;
 import com.elipair.spacestudyship.study.todo.repository.TodoCategoryRepository;
 import com.elipair.spacestudyship.study.todo.repository.TodoRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -21,6 +22,7 @@ class TodoServiceTest {
 
     @Mock TodoRepository todoRepository;
     @Mock TodoCategoryRepository categoryRepository;
+    @Mock EntityManager entityManager;
     @InjectMocks TodoService todoService;
 
     @Test
@@ -206,5 +208,34 @@ class TodoServiceTest {
                 .isInstanceOf(com.elipair.spacestudyship.common.exception.CustomException.class)
                 .extracting("errorCode")
                 .isEqualTo(com.elipair.spacestudyship.common.exception.ErrorCode.TODO_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("create: save 후 EntityManager.flush() 호출 — createdAt/updatedAt 보장")
+    void create_flushesAfterSave() {
+        var request = new com.elipair.spacestudyship.study.todo.dto.TodoCreateRequest(
+                "t-new", "수학", java.util.List.of(), null, java.util.List.of("2026-05-25"));
+        when(todoRepository.existsById("t-new")).thenReturn(false);
+        when(todoRepository.save(org.mockito.ArgumentMatchers.any(Todo.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        todoService.create(1L, request);
+
+        verify(entityManager).flush();
+    }
+
+    @Test
+    @DisplayName("update: mutation 후 EntityManager.flush() 호출 — updatedAt 갱신 보장")
+    void update_flushesAfterMutation() {
+        Todo existing = Todo.create("t1", 1L, "원본", null, null, null);
+        when(todoRepository.findByIdAndUserId("t1", 1L))
+                .thenReturn(java.util.Optional.of(existing));
+
+        var request = new com.elipair.spacestudyship.study.todo.dto.TodoUpdateRequest(
+                "새 제목", null, null, null, null, null);
+
+        todoService.update(1L, "t1", request);
+
+        verify(entityManager).flush();
     }
 }

@@ -8,6 +8,7 @@ import com.elipair.spacestudyship.study.todo.dto.CategoryUpdateRequest;
 import com.elipair.spacestudyship.study.todo.entity.TodoCategory;
 import com.elipair.spacestudyship.study.todo.repository.TodoCategoryRepository;
 import com.elipair.spacestudyship.study.todo.repository.TodoRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -22,6 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -29,6 +31,7 @@ class TodoCategoryServiceTest {
 
     @Mock TodoCategoryRepository categoryRepository;
     @Mock TodoRepository todoRepository;
+    @Mock EntityManager entityManager;
     @InjectMocks TodoCategoryService categoryService;
 
     @Test
@@ -129,5 +132,31 @@ class TodoCategoryServiceTest {
         assertThatThrownBy(() -> categoryService.delete(1L, "missing"))
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.CATEGORY_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("create: save 후 EntityManager.flush() 호출 — createdAt/updatedAt 보장")
+    void create_flushesAfterSave() {
+        var request = new CategoryCreateRequest("c-new", "수학", "math_icon", 0.3, 0.5);
+        when(categoryRepository.existsById("c-new")).thenReturn(false);
+        when(categoryRepository.save(any(TodoCategory.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+
+        categoryService.create(1L, request);
+
+        verify(entityManager).flush();
+    }
+
+    @Test
+    @DisplayName("update: mutation 후 EntityManager.flush() 호출 — updatedAt 갱신 보장")
+    void update_flushesAfterMutation() {
+        TodoCategory existing = TodoCategory.create("c1", 1L, "원본", "icon", 0.3, 0.5);
+        when(categoryRepository.findByIdAndUserId("c1", 1L))
+                .thenReturn(Optional.of(existing));
+
+        var request = new CategoryUpdateRequest("새이름", null, null, null);
+        categoryService.update(1L, "c1", request);
+
+        verify(entityManager).flush();
     }
 }

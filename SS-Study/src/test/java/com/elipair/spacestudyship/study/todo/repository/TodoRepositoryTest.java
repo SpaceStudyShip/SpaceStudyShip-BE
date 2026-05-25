@@ -84,4 +84,13 @@ class TodoRepositoryTest {
         assertThat(mine).isPresent();
         assertThat(other).isEmpty();
     }
+
+    @Test
+    @DisplayName("saveAndFlush: assigned-ID Todo의 timestamp가 flush 후 채워짐 (Hibernate 회귀 알람)")
+    void saveAndFlush_populatesTimestamps() {
+        Todo saved = todoRepository.saveAndFlush(Todo.create("t-ts", 1L, "X", null, null, null));
+
+        assertThat(saved.getCreatedAt()).isNotNull();
+        assertThat(saved.getUpdatedAt()).isNotNull();
+    }
 }

@@ -10,12 +10,14 @@ import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
 import java.util.Date;
 import java.util.Optional;
 
+@Slf4j
 @Component
 public class JwtTokenProvider {
 
@@ -45,12 +47,14 @@ public class JwtTokenProvider {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + jwtProperties.access().expiration().toMillis());
 
-        return Jwts.builder()
+        String token = Jwts.builder()
                 .subject(member.getId().toString())
                 .issuedAt(now)
                 .expiration(expiration)
                 .signWith(accessKey)
                 .compact();
+        log.info("[Jwt] AccessToken 발급 | memberId={}, expiresAt={}", member.getId(), expiration);
+        return token;
     }
 
     public Long getMemberIdFromAccessToken(String accessToken) {
@@ -84,13 +88,16 @@ public class JwtTokenProvider {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + jwtProperties.refresh().expiration().toMillis());
 
-        return Jwts.builder()
+        String token = Jwts.builder()
                 .subject(member.getId().toString())
                 .claim(CLAIM_DEVICE_ID, deviceId)
                 .issuedAt(now)
                 .expiration(expiration)
                 .signWith(refreshKey)
                 .compact();
+        log.info("[Jwt] RefreshToken 발급 | memberId={}, deviceId={}, expiresAt={}",
+                member.getId(), deviceId, expiration);
+        return token;
     }
 
     public RefreshTokenPayloadDto parseRefreshToken(String refreshToken) {

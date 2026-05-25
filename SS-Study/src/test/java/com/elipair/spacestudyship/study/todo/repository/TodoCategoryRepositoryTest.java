@@ -69,4 +69,14 @@ class TodoCategoryRepositoryTest {
 
         assertThat(count).isEqualTo(2L);
     }
+
+    @Test
+    @DisplayName("saveAndFlush: assigned-ID TodoCategory의 timestamp가 flush 후 채워짐 (Hibernate 회귀 알람)")
+    void saveAndFlush_populatesTimestamps() {
+        TodoCategory saved = categoryRepository.saveAndFlush(
+                TodoCategory.create("c-ts", 1L, "수학", null, null, null));
+
+        assertThat(saved.getCreatedAt()).isNotNull();
+        assertThat(saved.getUpdatedAt()).isNotNull();
+    }
 }
