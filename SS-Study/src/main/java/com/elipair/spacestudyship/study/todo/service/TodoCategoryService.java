@@ -8,6 +8,7 @@ import com.elipair.spacestudyship.study.todo.dto.CategoryUpdateRequest;
 import com.elipair.spacestudyship.study.todo.entity.TodoCategory;
 import com.elipair.spacestudyship.study.todo.repository.TodoCategoryRepository;
 import com.elipair.spacestudyship.study.todo.repository.TodoRepository;
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ public class TodoCategoryService {
 
     private final TodoCategoryRepository categoryRepository;
     private final TodoRepository todoRepository;
+    private final EntityManager entityManager;
 
     public List<CategoryResponse> findAll(Long userId) {
         return categoryRepository.findByUserIdOrderByCreatedAtAsc(userId)
@@ -40,6 +42,7 @@ public class TodoCategoryService {
                 id, userId, request.name(),
                 request.iconId(), request.positionX(), request.positionY());
         TodoCategory saved = categoryRepository.save(category);
+        entityManager.flush();
         log.info("[TodoCategory] 생성 | userId={}, categoryId={}", userId, saved.getId());
         return CategoryResponse.from(saved);
     }
@@ -52,6 +55,7 @@ public class TodoCategoryService {
         if (request.iconId() != null) category.updateIconId(request.iconId());
         if (request.positionX() != null) category.updatePositionX(request.positionX());
         if (request.positionY() != null) category.updatePositionY(request.positionY());
+        entityManager.flush();
         log.info("[TodoCategory] 수정 | userId={}, categoryId={}", userId, categoryId);
         return CategoryResponse.from(category);
     }
