@@ -11,6 +11,8 @@ import com.elipair.spacestudyship.study.timer.dto.TimerSessionListResponse;
 import com.elipair.spacestudyship.study.timer.dto.TodayStatsResponse;
 import com.elipair.spacestudyship.study.timer.service.TimerSessionService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -80,6 +82,9 @@ public class TimerSessionController {
     public ResponseEntity<TimerSessionCreateResponse> create(
             @AuthMember LoginMember loginMember,
             @Valid @RequestBody TimerSessionCreateRequest request,
+            @Parameter(in = ParameterIn.HEADER, name = "Idempotency-Key",
+                    description = "재시도 시 중복 저장 방지용 키 (선택). 동일 키 재요청 시 기존 세션 반환.",
+                    example = "550e8400-e29b-41d4-a716-446655440000")
             @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
 
         TimerSessionCreateResponse response = timerSessionService.create(
