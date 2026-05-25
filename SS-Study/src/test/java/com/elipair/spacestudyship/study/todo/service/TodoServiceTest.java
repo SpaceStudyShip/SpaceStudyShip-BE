@@ -238,4 +238,38 @@ class TodoServiceTest {
 
         verify(entityManager).flush();
     }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("addActualMinutes: 정상 흐름 — repository 호출 및 로그")
+    void addActualMinutes_success() {
+        org.mockito.BDDMockito.given(todoRepository.addActualMinutes(1L, "t-1", 30))
+                .willReturn(1);
+
+        todoService.addActualMinutes(1L, "t-1", 30);
+
+        org.mockito.Mockito.verify(todoRepository).addActualMinutes(1L, "t-1", 30);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("addActualMinutes: minutes <= 0 → INVALID_INPUT_VALUE")
+    void addActualMinutes_nonPositive_throws() {
+        org.assertj.core.api.Assertions
+                .assertThatThrownBy(() -> todoService.addActualMinutes(1L, "t-1", 0))
+                .isInstanceOf(com.elipair.spacestudyship.common.exception.CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(com.elipair.spacestudyship.common.exception.ErrorCode.INVALID_INPUT_VALUE);
+    }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("addActualMinutes: 영향 row 0 → TODO_NOT_FOUND")
+    void addActualMinutes_notFound_throws() {
+        org.mockito.BDDMockito.given(todoRepository.addActualMinutes(1L, "nope", 30))
+                .willReturn(0);
+
+        org.assertj.core.api.Assertions
+                .assertThatThrownBy(() -> todoService.addActualMinutes(1L, "nope", 30))
+                .isInstanceOf(com.elipair.spacestudyship.common.exception.CustomException.class)
+                .extracting("errorCode")
+                .isEqualTo(com.elipair.spacestudyship.common.exception.ErrorCode.TODO_NOT_FOUND);
+    }
 }

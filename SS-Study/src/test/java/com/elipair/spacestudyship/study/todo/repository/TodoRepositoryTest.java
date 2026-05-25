@@ -2,6 +2,7 @@ package com.elipair.spacestudyship.study.todo.repository;
 
 import com.elipair.spacestudyship.study.StudyTestApplication;
 import com.elipair.spacestudyship.study.todo.entity.Todo;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,6 +20,9 @@ class TodoRepositoryTest {
 
     @Autowired
     TodoRepository todoRepository;
+
+    @Autowired
+    EntityManager em;
 
     @Test
     @DisplayName("findByUserIdOrderByCreatedAtDesc: 본인 Todo만, 최신순 반환 (id 순서까지 검증)")
@@ -92,5 +96,47 @@ class TodoRepositoryTest {
 
         assertThat(saved.getCreatedAt()).isNotNull();
         assertThat(saved.getUpdatedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("addActualMinutes: 본인 todo 누적 — null → 0+minutes, 기존 → 기존+minutes")
+    void addActualMinutes_accumulates() {
+        Todo t = Todo.create(
+                "t-1", 1L, "수학",
+                List.of("2026-05-25"),
+                List.of(),
+                60);
+        todoRepository.saveAndFlush(t);
+
+        int updated1 = todoRepository.addActualMinutes(1L, "t-1", 30);
+        assertThat(updated1).isEqualTo(1);
+        em.clear();
+        assertThat(todoRepository.findById("t-1").get().getActualMinutes()).isEqualTo(30);
+
+        int updated2 = todoRepository.addActualMinutes(1L, "t-1", 45);
+        assertThat(updated2).isEqualTo(1);
+        em.clear();
+        assertThat(todoRepository.findById("t-1").get().getActualMinutes()).isEqualTo(75);
+    }
+
+    @Test
+    @DisplayName("addActualMinutes: 본인 소유 아님 → affected=0")
+    void addActualMinutes_otherUser_returnsZero() {
+        Todo t = Todo.create(
+                "t-1", 1L, "수학",
+                List.of("2026-05-25"),
+                List.of(),
+                60);
+        todoRepository.saveAndFlush(t);
+
+        int updated = todoRepository.addActualMinutes(2L, "t-1", 30);
+        assertThat(updated).isZero();
+    }
+
+    @Test
+    @DisplayName("addActualMinutes: 없는 todoId → affected=0")
+    void addActualMinutes_missingTodo_returnsZero() {
+        int updated = todoRepository.addActualMinutes(1L, "nope", 30);
+        assertThat(updated).isZero();
     }
 }

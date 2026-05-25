@@ -112,4 +112,17 @@ public class TodoService {
         }
         log.info("[Todo] 삭제 | userId={}, todoId={}", userId, todoId);
     }
+
+    @Transactional
+    public void addActualMinutes(Long userId, String todoId, int minutes) {
+        if (minutes <= 0) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        int updated = todoRepository.addActualMinutes(userId, todoId, minutes);
+        if (updated == 0) {
+            throw new CustomException(ErrorCode.TODO_NOT_FOUND);
+        }
+        log.info("[Todo] actualMinutes 누적 | userId={}, todoId={}, addedMinutes={}",
+                userId, todoId, minutes);
+    }
 }

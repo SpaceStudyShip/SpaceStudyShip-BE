@@ -224,6 +224,7 @@ log.warn("[Action] 경고 설명");
 | 0.0.31 | `V0_0_31__add_user_devices.sql` | 초기 스키마 — `members`, `user_devices` 테이블 생성 (FK 포함) |
 | 0.0.34 | `V0_0_34__add_todos_and_categories.sql` | `todos`, `todo_categories` 테이블 생성 (FK CASCADE, JSONB 컬럼) |
 | 0.0.36 | `V0_0_36__add_fuel.sql` | `user_fuel`, `fuel_transactions` 테이블 생성 (CHECK 제약, FK CASCADE) |
+| 0.0.39 | `V0_0_39__add_timer_sessions.sql` | `timer_sessions` 테이블 생성 (FK CASCADE, CHECK 제약 3종, 부분 unique 인덱스 on idempotency_key) |
 
 ---
 

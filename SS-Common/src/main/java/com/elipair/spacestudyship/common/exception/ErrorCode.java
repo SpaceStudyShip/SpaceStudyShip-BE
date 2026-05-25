@@ -34,6 +34,13 @@ public enum ErrorCode {
     INSUFFICIENT_FUEL(HttpStatus.BAD_REQUEST, "연료가 부족합니다."),
     FUEL_NOT_INITIALIZED(HttpStatus.INTERNAL_SERVER_ERROR, "연료 정보가 초기화되지 않았습니다."),
 
+    // Timer
+    INVALID_SESSION_TIME(HttpStatus.BAD_REQUEST, "시작 시각이 종료 시각보다 늦거나 같습니다."),
+    INVALID_DURATION(HttpStatus.BAD_REQUEST, "공부 시간이 시작/종료 시각 간격보다 큽니다."),
+    SESSION_TOO_SHORT(HttpStatus.BAD_REQUEST, "공부 시간은 1분 이상이어야 합니다."),
+    SESSION_TOO_LONG(HttpStatus.BAD_REQUEST, "공부 시간은 24시간(1440분)을 초과할 수 없습니다."),
+    FUTURE_SESSION(HttpStatus.BAD_REQUEST, "미래 시각의 세션은 저장할 수 없습니다."),
+
     // Common
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "입력값이 유효하지 않습니다."),
     INVALID_REQUEST_BODY(HttpStatus.BAD_REQUEST, "요청 본문의 형식이 잘못되었습니다."),
