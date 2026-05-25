@@ -122,6 +122,7 @@ public class TodoService {
         if (updated == 0) {
             throw new CustomException(ErrorCode.TODO_NOT_FOUND);
         }
-        log.info("[Todo] actualMinutes 누적 | userId={}, todoId={}, +{}분", userId, todoId, minutes);
+        log.info("[Todo] actualMinutes 누적 | userId={}, todoId={}, addedMinutes={}",
+                userId, todoId, minutes);
     }
 }

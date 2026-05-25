@@ -60,21 +60,26 @@ class TimerSessionRepositoryTest {
         repository.saveAndFlush(
                 session(1L, LocalDateTime.parse("2026-05-25T01:00:00"), 30, null, "idem-1"));
 
-        // 동일 (user, key) 두번째 INSERT는 savepoint 구간에서 실패 후 rollback to savepoint
+        // 동일 (user, key) 두번째 INSERT는 savepoint 구간에서 실패 후 rollback to savepoint.
+        // PostgreSQL unique_violation SQLState(23505)만 "중복 위반"으로 식별 — 다른 SQLException은 rethrow.
+        // PreparedStatement는 try-with-resources로 명시 close.
+        String sql = "INSERT INTO timer_sessions (id, user_id, todo_id, todo_title, started_at, ended_at, " +
+                "duration_minutes, idempotency_key, created_at, updated_at) " +
+                "VALUES (?, 1, NULL, NULL, " +
+                "'2026-05-25 02:00:00', '2026-05-25 02:30:00', 30, 'idem-1', NOW(), NOW())";
         boolean constraintViolated = em.unwrap(Session.class).doReturningWork(conn -> {
             Savepoint sp = conn.setSavepoint("dup_check");
-            try {
-                conn.prepareStatement(
-                        "INSERT INTO timer_sessions (id, user_id, todo_id, todo_title, started_at, ended_at, " +
-                        "duration_minutes, idempotency_key, created_at, updated_at) " +
-                        "VALUES ('" + UUID.randomUUID() + "', 1, NULL, NULL, " +
-                        "'2026-05-25 02:00:00', '2026-05-25 02:30:00', 30, 'idem-1', NOW(), NOW())"
-                ).executeUpdate();
+            try (java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+                ps.setString(1, UUID.randomUUID().toString());
+                ps.executeUpdate();
                 conn.releaseSavepoint(sp);
                 return false;
             } catch (java.sql.SQLException e) {
                 conn.rollback(sp);
-                return true; // 중복 키 위반 확인
+                if ("23505".equals(e.getSQLState())) {
+                    return true; // PostgreSQL unique_violation 확인
+                }
+                throw e;
             }
         });
         assertThat(constraintViolated).isTrue();
@@ -146,12 +151,12 @@ class TimerSessionRepositoryTest {
         repository.saveAndFlush(session(1L, LocalDateTime.parse("2026-05-24T03:00:00"), 60, null, null));
         repository.saveAndFlush(session(1L, LocalDateTime.parse("2026-05-23T01:00:00"), 90, null, null));
 
-        Integer sum = repository.sumDurationBetween(1L,
+        Long sum = repository.sumDurationBetween(1L,
                 LocalDateTime.parse("2026-05-24T00:00:00"),
                 LocalDateTime.parse("2026-05-25T00:00:00"));
-        assertThat(sum).isEqualTo(90);
+        assertThat(sum).isEqualTo(90L);
 
-        Integer none = repository.sumDurationBetween(1L,
+        Long none = repository.sumDurationBetween(1L,
                 LocalDateTime.parse("2026-06-01T00:00:00"),
                 LocalDateTime.parse("2026-06-02T00:00:00"));
         assertThat(none).isZero();

@@ -31,9 +31,13 @@ import java.time.LocalDateTime;
         @Check(name = "chk_timer_duration_max",      constraints = "duration_minutes <= 1440"),
         @Check(name = "chk_timer_time_order",        constraints = "ended_at > started_at")
 })
+// JPA 표준 @Index.columnList는 정렬 방향(ASC/DESC)을 지원하지 않아 Hibernate가
+// silently 무시한다. 정렬은 쿼리 레벨(Sort.by Direction.DESC)에서 처리하며,
+// production 인덱스는 Flyway 마이그레이션(V0_0_39__add_timer_sessions.sql)에서
+// (user_id, started_at DESC)로 명시적으로 생성한다.
 @Table(name = "timer_sessions",
         indexes = {
-                @Index(name = "idx_timer_sessions_user_started", columnList = "user_id, started_at DESC"),
+                @Index(name = "idx_timer_sessions_user_started", columnList = "user_id, started_at"),
                 @Index(name = "idx_timer_sessions_user_todo", columnList = "user_id, todo_id")
         })
 @Getter

@@ -152,7 +152,7 @@ class TimerSessionServiceTest {
         TimerSessionCreateResponse res = service.create(1L, req, null);
 
         ArgumentCaptor<TimerSession> savedCap = ArgumentCaptor.forClass(TimerSession.class);
-        verify(sessionRepository).save(savedCap.capture());
+        verify(sessionRepository).saveAndFlush(savedCap.capture());
         TimerSession saved = savedCap.getValue();
 
         assertThat(saved.getUserId()).isEqualTo(1L);
@@ -197,7 +197,7 @@ class TimerSessionServiceTest {
 
         TimerSessionCreateResponse res = service.create(1L, validRequest(60), "idem-1");
 
-        verify(sessionRepository, never()).save(any());
+        verify(sessionRepository, never()).saveAndFlush(any());
         verifyNoInteractions(fuelService);
         verifyNoInteractions(todoService);
         assertThat(res.session().id()).isEqualTo("existing-id");
@@ -211,12 +211,12 @@ class TimerSessionServiceTest {
 
         verify(sessionRepository, never()).findByUserIdAndIdempotencyKey(anyLong(), any());
         ArgumentCaptor<TimerSession> cap = ArgumentCaptor.forClass(TimerSession.class);
-        verify(sessionRepository).save(cap.capture());
+        verify(sessionRepository).saveAndFlush(cap.capture());
         assertThat(cap.getValue().getIdempotencyKey()).isNull();
     }
 
     @Test
-    @DisplayName("Idempotency race: save 시 DataIntegrityViolation → 재조회 후 기존 반환")
+    @DisplayName("Idempotency race: saveAndFlush 시 DataIntegrityViolation → 재조회 후 기존 반환")
     void idempotency_race_resolvedByReSelect() {
         given(sessionRepository.findByUserIdAndIdempotencyKey(1L, "idem-1"))
                 .willReturn(Optional.empty())
@@ -225,7 +225,7 @@ class TimerSessionServiceTest {
                         LocalDateTime.parse("2026-05-25T01:00:00"),
                         LocalDateTime.parse("2026-05-25T02:00:00"),
                         60, "idem-1")));
-        given(sessionRepository.save(any(TimerSession.class)))
+        given(sessionRepository.saveAndFlush(any(TimerSession.class)))
                 .willThrow(new DataIntegrityViolationException("unique violation"));
 
         TimerSessionCreateResponse res = service.create(1L, validRequest(60), "idem-1");
@@ -236,11 +236,11 @@ class TimerSessionServiceTest {
     }
 
     @Test
-    @DisplayName("Idempotency race: save 실패했는데 재조회도 empty → 원본 예외 rethrow")
+    @DisplayName("Idempotency race: saveAndFlush 실패했는데 재조회도 empty → 원본 예외 rethrow")
     void idempotency_race_rethrowIfStillMissing() {
         given(sessionRepository.findByUserIdAndIdempotencyKey(1L, "idem-1"))
                 .willReturn(Optional.empty());
-        given(sessionRepository.save(any(TimerSession.class)))
+        given(sessionRepository.saveAndFlush(any(TimerSession.class)))
                 .willThrow(new DataIntegrityViolationException("unique violation"));
 
         assertThatThrownBy(() -> service.create(1L, validRequest(60), "idem-1"))
@@ -267,9 +267,23 @@ class TimerSessionServiceTest {
     }
 
     @Test
+    @DisplayName("getList: 빈/공백 파라미터는 null로 정규화되어 필터 미적용")
+    void getList_blankParamsNormalizedToNull() {
+        Page<TimerSession> empty = new PageImpl<>(List.of());
+        given(sessionRepository.findByFilters(eq(1L), isNull(), isNull(), isNull(), any(Pageable.class)))
+                .willReturn(empty);
+
+        // todoId/startDate/endDate 모두 blank
+        service.getList(1L, "", "  ", "", 0, 20);
+
+        // 정규화된 null이 레포로 전달됨
+        verify(sessionRepository).findByFilters(eq(1L), isNull(), isNull(), isNull(), any(Pageable.class));
+    }
+
+    @Test
     @DisplayName("today-stats: 빈 데이터 → 모두 0")
     void todayStats_empty() {
-        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(0);
+        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(0L);
         given(sessionRepository
                 .countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(eq(1L), any(), any()))
                 .willReturn(0L);
@@ -283,7 +297,7 @@ class TimerSessionServiceTest {
     @Test
     @DisplayName("today-stats: 정상 데이터 + streak 계산")
     void todayStats_withData() {
-        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(180);
+        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(180L);
         given(sessionRepository
                 .countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(eq(1L), any(), any()))
                 .willReturn(3L);
@@ -304,7 +318,7 @@ class TimerSessionServiceTest {
     @Test
     @DisplayName("streak: 어제까지만 했으면 어제 기준으로 N (오늘 포함 X)")
     void streak_yesterdayLatest() {
-        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(0);
+        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(0L);
         given(sessionRepository
                 .countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(eq(1L), any(), any()))
                 .willReturn(0L);
@@ -322,7 +336,7 @@ class TimerSessionServiceTest {
     @Test
     @DisplayName("streak: 마지막 공부일이 어제보다 이전 → 0")
     void streak_brokenChain() {
-        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(0);
+        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(0L);
         given(sessionRepository
                 .countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(eq(1L), any(), any()))
                 .willReturn(0L);
@@ -337,7 +351,7 @@ class TimerSessionServiceTest {
     @Test
     @DisplayName("streak: latest가 미래(clock skew)면 today로 클램프")
     void streak_futureLatest_clampedToToday() {
-        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(0);
+        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(0L);
         given(sessionRepository
                 .countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(eq(1L), any(), any()))
                 .willReturn(0L);

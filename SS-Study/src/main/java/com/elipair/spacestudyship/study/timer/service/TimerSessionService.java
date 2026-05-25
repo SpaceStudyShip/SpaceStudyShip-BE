@@ -77,7 +77,10 @@ public class TimerSessionService {
                 normalizedKey);
 
         try {
-            sessionRepository.save(session);
+            // saveAndFlush로 INSERT를 즉시 DB에 반영해 unique constraint 위반을
+            // 이 try 블록 안에서 잡을 수 있도록 보장한다. 일반 save()는 flush를
+            // 트랜잭션 커밋 시점까지 미루므로 race 복구 분기가 동작하지 않는다.
+            sessionRepository.saveAndFlush(session);
         } catch (DataIntegrityViolationException e) {
             if (normalizedKey != null) {
                 Optional<TimerSession> raced = sessionRepository
@@ -131,16 +134,26 @@ public class TimerSessionService {
             Long userId, String startDate, String endDate, String todoId,
             int page, int size) {
 
-        LocalDateTime start = startDate == null ? null
-                : LocalDate.parse(startDate).atStartOfDay();
-        LocalDateTime end = endDate == null ? null
-                : LocalDate.parse(endDate).plusDays(1).atStartOfDay();
+        // 빈/공백 문자열은 null로 정규화 — `?todoId=` 같은 빈 파라미터를
+        // "필터 미적용"으로 해석 (그대로 두면 JPQL `s.todoId = ''` 매칭으로 빈 결과 반환)
+        String normalizedStartDate = blankToNull(startDate);
+        String normalizedEndDate   = blankToNull(endDate);
+        String normalizedTodoId    = blankToNull(todoId);
+
+        LocalDateTime start = normalizedStartDate == null ? null
+                : LocalDate.parse(normalizedStartDate).atStartOfDay();
+        LocalDateTime end = normalizedEndDate == null ? null
+                : LocalDate.parse(normalizedEndDate).plusDays(1).atStartOfDay();
 
         Pageable pageable = PageRequest.of(page, size,
                 Sort.by(Sort.Direction.DESC, "startedAt"));
         Page<TimerSession> result = sessionRepository.findByFilters(
-                userId, start, end, todoId, pageable);
+                userId, start, end, normalizedTodoId, pageable);
         return TimerSessionListResponse.from(result);
+    }
+
+    private static String blankToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
     }
 
     public TodayStatsResponse getTodayStats(Long userId) {
@@ -148,9 +161,9 @@ public class TimerSessionService {
         LocalDateTime todayStartUtc    = toUtcLdt(todayKst.atStartOfDay(ZONE_KST));
         LocalDateTime tomorrowStartUtc = toUtcLdt(todayKst.plusDays(1).atStartOfDay(ZONE_KST));
 
-        Integer totalMinutes = Optional.ofNullable(
+        long totalMinutes = Optional.ofNullable(
                 sessionRepository.sumDurationBetween(userId, todayStartUtc, tomorrowStartUtc))
-                .orElse(0);
+                .orElse(0L);
         long sessionCount = sessionRepository
                 .countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
                         userId, todayStartUtc, tomorrowStartUtc);
@@ -161,7 +174,7 @@ public class TimerSessionService {
                 .findStartedAtsAfter(userId, lookbackStart);
 
         int streak = computeStreak(startedAts, todayKst);
-        return new TodayStatsResponse(totalMinutes, (int) sessionCount, streak);
+        return new TodayStatsResponse(Math.toIntExact(totalMinutes), (int) sessionCount, streak);
     }
 
     private LocalDateTime toUtcLdt(ZonedDateTime kst) {

@@ -34,11 +34,12 @@ public interface TimerSessionRepository extends JpaRepository<TimerSession, Stri
             @Param("todoId") String todoId,
             Pageable pageable);
 
-    @Query("SELECT COALESCE(SUM(s.durationMinutes), 0) FROM TimerSession s " +
+    // JPQL SUM(Integer state-field) → Long 반환이 JPA 스펙. COALESCE 기본값도 0L로 맞춘다.
+    @Query("SELECT COALESCE(SUM(s.durationMinutes), 0L) FROM TimerSession s " +
            "WHERE s.userId = :userId AND s.startedAt >= :start AND s.startedAt < :end")
-    Integer sumDurationBetween(@Param("userId") Long userId,
-                               @Param("start") LocalDateTime start,
-                               @Param("end") LocalDateTime end);
+    Long sumDurationBetween(@Param("userId") Long userId,
+                            @Param("start") LocalDateTime start,
+                            @Param("end") LocalDateTime end);
 
     long countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(
             Long userId, LocalDateTime start, LocalDateTime end);
