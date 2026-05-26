@@ -321,6 +321,8 @@ class TimerSessionServiceTest {
                 .countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(eq(1L), any(), any()))
                 .willReturn(0L);
         given(sessionRepository.findStartedAtsAfter(eq(1L), any())).willReturn(List.of());
+        given(sessionRepository.sumDurationByUserId(eq(1L))).willReturn(0L);
+        given(sessionRepository.countByUserId(eq(1L))).willReturn(0L);
 
         TodayStatsResponse res = service.getTodayStats(1L);
 
@@ -328,9 +330,19 @@ class TimerSessionServiceTest {
     }
 
     @Test
-    @DisplayName("today-stats: 정상 데이터 + streak 계산")
+    @DisplayName("today-stats: 정상 데이터 + streak + lifetime/monthly 계산")
     void todayStats_withData() {
-        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(180L);
+        // sumDurationBetween는 오늘 + 이번 달 두 번 호출됨.
+        // fixedClock=2026-05-25T12:00:00Z → KST 2026-05-25 21:00 → 오늘=2026-05-25 KST, 월 시작=2026-05-01 KST.
+        // 둘 다 any() 매칭 시 마지막 stub이 우선이므로, 명시적으로 호출별 stub을 분리한다.
+        given(sessionRepository.sumDurationBetween(eq(1L),
+                eq(LocalDateTime.parse("2026-05-24T15:00:00")),    // 오늘 시작 (KST 5/25 00:00 = UTC 5/24 15:00)
+                eq(LocalDateTime.parse("2026-05-25T15:00:00"))))   // 내일 시작 (KST 5/26 00:00 = UTC 5/25 15:00)
+                .willReturn(180L);
+        given(sessionRepository.sumDurationBetween(eq(1L),
+                eq(LocalDateTime.parse("2026-04-30T15:00:00")),    // 5월 시작 KST 5/1 00:00 = UTC 4/30 15:00
+                eq(LocalDateTime.parse("2026-05-31T15:00:00"))))   // 6월 시작 KST 6/1 00:00 = UTC 5/31 15:00
+                .willReturn(1820L);
         given(sessionRepository
                 .countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(eq(1L), any(), any()))
                 .willReturn(3L);
@@ -340,12 +352,17 @@ class TimerSessionServiceTest {
                         LocalDateTime.parse("2026-05-23T16:00:00"),
                         LocalDateTime.parse("2026-05-22T16:00:00")
                 ));
+        given(sessionRepository.sumDurationByUserId(eq(1L))).willReturn(12450L);
+        given(sessionRepository.countByUserId(eq(1L))).willReturn(287L);
 
         TodayStatsResponse res = service.getTodayStats(1L);
 
         assertThat(res.totalMinutes()).isEqualTo(180);
         assertThat(res.sessionCount()).isEqualTo(3);
         assertThat(res.streak()).isEqualTo(3);
+        assertThat(res.lifetimeMinutes()).isEqualTo(12450);
+        assertThat(res.lifetimeSessionCount()).isEqualTo(287);
+        assertThat(res.monthlyMinutes()).isEqualTo(1820);
     }
 
     @Test
@@ -360,6 +377,8 @@ class TimerSessionServiceTest {
                         LocalDateTime.parse("2026-05-23T16:00:00"),
                         LocalDateTime.parse("2026-05-22T16:00:00")
                 ));
+        given(sessionRepository.sumDurationByUserId(eq(1L))).willReturn(0L);
+        given(sessionRepository.countByUserId(eq(1L))).willReturn(0L);
 
         TodayStatsResponse res = service.getTodayStats(1L);
 
@@ -375,6 +394,8 @@ class TimerSessionServiceTest {
                 .willReturn(0L);
         given(sessionRepository.findStartedAtsAfter(eq(1L), any()))
                 .willReturn(List.of(LocalDateTime.parse("2026-05-22T16:00:00")));
+        given(sessionRepository.sumDurationByUserId(eq(1L))).willReturn(0L);
+        given(sessionRepository.countByUserId(eq(1L))).willReturn(0L);
 
         TodayStatsResponse res = service.getTodayStats(1L);
 
@@ -394,9 +415,80 @@ class TimerSessionServiceTest {
                         LocalDateTime.parse("2026-05-25T01:00:00"),
                         LocalDateTime.parse("2026-05-23T16:00:00")
                 ));
+        given(sessionRepository.sumDurationByUserId(eq(1L))).willReturn(0L);
+        given(sessionRepository.countByUserId(eq(1L))).willReturn(0L);
 
         TodayStatsResponse res = service.getTodayStats(1L);
 
         assertThat(res.streak()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("today-stats: lifetime/monthly — KST 월 경계가 sumDurationBetween 인자에 정확히 매핑")
+    void todayStats_monthlyBoundary_kst() {
+        // fixedClock=2026-05-25T12:00:00Z → KST 5/25.
+        // 이번 달 시작 KST 2026-05-01 00:00 = UTC 2026-04-30 15:00
+        // 다음 달 시작 KST 2026-06-01 00:00 = UTC 2026-05-31 15:00
+        LocalDateTime expectedMonthStartUtc = LocalDateTime.parse("2026-04-30T15:00:00");
+        LocalDateTime expectedMonthEndUtc   = LocalDateTime.parse("2026-05-31T15:00:00");
+
+        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(0L);
+        given(sessionRepository
+                .countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(eq(1L), any(), any()))
+                .willReturn(0L);
+        given(sessionRepository.findStartedAtsAfter(eq(1L), any())).willReturn(List.of());
+        given(sessionRepository.sumDurationByUserId(eq(1L))).willReturn(0L);
+        given(sessionRepository.countByUserId(eq(1L))).willReturn(0L);
+
+        service.getTodayStats(1L);
+
+        // sumDurationBetween가 정확히 KST 월 경계(UTC 변환된 값)로 호출됐는지 검증
+        verify(sessionRepository).sumDurationBetween(eq(1L),
+                eq(expectedMonthStartUtc), eq(expectedMonthEndUtc));
+    }
+
+    @Test
+    @DisplayName("today-stats: lifetime 0건 → 3 필드 모두 0 (null 금지)")
+    void todayStats_lifetimeZero_returnsZeroNotNull() {
+        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(0L);
+        given(sessionRepository
+                .countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(eq(1L), any(), any()))
+                .willReturn(0L);
+        given(sessionRepository.findStartedAtsAfter(eq(1L), any())).willReturn(List.of());
+        given(sessionRepository.sumDurationByUserId(eq(1L))).willReturn(0L);
+        given(sessionRepository.countByUserId(eq(1L))).willReturn(0L);
+
+        TodayStatsResponse res = service.getTodayStats(1L);
+
+        assertThat(res.lifetimeMinutes()).isNotNull().isZero();
+        assertThat(res.lifetimeSessionCount()).isNotNull().isZero();
+        assertThat(res.monthlyMinutes()).isNotNull().isZero();
+    }
+
+    @Test
+    @DisplayName("today-stats: 지난달 + 이번 달 혼합 → monthly < lifetime, lifetime = 전체 합")
+    void todayStats_mixedMonths_lifetimeGreaterThanMonthly() {
+        // sumDurationBetween는 (오늘, 이번 달) 두 번 호출 — 호출 인자로 구분
+        given(sessionRepository.sumDurationBetween(eq(1L),
+                eq(LocalDateTime.parse("2026-05-24T15:00:00")),
+                eq(LocalDateTime.parse("2026-05-25T15:00:00"))))
+                .willReturn(0L);
+        given(sessionRepository.sumDurationBetween(eq(1L),
+                eq(LocalDateTime.parse("2026-04-30T15:00:00")),
+                eq(LocalDateTime.parse("2026-05-31T15:00:00"))))
+                .willReturn(1820L);
+        given(sessionRepository
+                .countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(eq(1L), any(), any()))
+                .willReturn(0L);
+        given(sessionRepository.findStartedAtsAfter(eq(1L), any())).willReturn(List.of());
+        given(sessionRepository.sumDurationByUserId(eq(1L))).willReturn(12450L);
+        given(sessionRepository.countByUserId(eq(1L))).willReturn(287L);
+
+        TodayStatsResponse res = service.getTodayStats(1L);
+
+        assertThat(res.lifetimeMinutes()).isEqualTo(12450);
+        assertThat(res.monthlyMinutes()).isEqualTo(1820);
+        assertThat(res.monthlyMinutes()).isLessThan(res.lifetimeMinutes());
+        assertThat(res.lifetimeSessionCount()).isEqualTo(287);
     }
 }

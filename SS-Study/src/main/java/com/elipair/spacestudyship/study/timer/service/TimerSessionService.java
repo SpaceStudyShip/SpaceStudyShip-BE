@@ -178,10 +178,29 @@ public class TimerSessionService {
                 todayKst.minusDays(STREAK_LOOKBACK_DAYS).atStartOfDay(ZONE_KST));
         List<LocalDateTime> startedAts = sessionRepository
                 .findStartedAtsAfter(userId, lookbackStart);
-
         int streak = computeStreak(startedAts, todayKst);
-        // Task 3에서 lifetime/monthly 합산 로직으로 교체 — 현재는 컴파일 유지용 0 주입
-        return new TodayStatsResponse(Math.toIntExact(totalMinutes), (int) sessionCount, streak, 0, 0, 0);
+
+        // 이번 달 KST 경계 → UTC 변환 후 기존 sumDurationBetween 재사용
+        LocalDate monthStartKst = todayKst.withDayOfMonth(1);
+        LocalDateTime monthStartUtc = toUtcLdt(monthStartKst.atStartOfDay(ZONE_KST));
+        LocalDateTime monthEndUtc   = toUtcLdt(monthStartKst.plusMonths(1).atStartOfDay(ZONE_KST));
+        long monthlyMinutes = Optional.ofNullable(
+                sessionRepository.sumDurationBetween(userId, monthStartUtc, monthEndUtc))
+                .orElse(0L);
+
+        // 전체 누적 (lifetime) — Repository에서 COALESCE로 NULL-safe
+        long lifetimeMinutes      = Optional.ofNullable(
+                sessionRepository.sumDurationByUserId(userId)).orElse(0L);
+        long lifetimeSessionCount = sessionRepository.countByUserId(userId);
+
+        return new TodayStatsResponse(
+                Math.toIntExact(totalMinutes),
+                (int) sessionCount,
+                streak,
+                Math.toIntExact(lifetimeMinutes),
+                Math.toIntExact(lifetimeSessionCount),
+                Math.toIntExact(monthlyMinutes)
+        );
     }
 
     private LocalDateTime toUtcLdt(ZonedDateTime kst) {
