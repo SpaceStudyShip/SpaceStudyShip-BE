@@ -99,4 +99,88 @@ class UserFuelTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.INSUFFICIENT_FUEL);
     }
+
+    // ---------- chargeFromStudy (30분 = 1연료) ----------
+
+    @Test
+    @DisplayName("chargeFromStudy: 30분 정확히 → 1연료 충전, pending=0")
+    void chargeFromStudy_exactly30_charges1() {
+        UserFuel fuel = UserFuel.initialize(1L);
+
+        UserFuel.ChargeFromStudyResult result = fuel.chargeFromStudy(30);
+
+        assertThat(result.amount()).isEqualTo(1);
+        assertThat(result.newPendingMinutes()).isZero();
+        assertThat(fuel.getCurrentFuel()).isEqualTo(1);
+        assertThat(fuel.getTotalCharged()).isEqualTo(1);
+        assertThat(fuel.getPendingMinutes()).isZero();
+    }
+
+    @Test
+    @DisplayName("chargeFromStudy: 25분 → 0연료, pending=25 누적 (transaction 없이 잔여분만 이월)")
+    void chargeFromStudy_under30_pendingOnly() {
+        UserFuel fuel = UserFuel.initialize(1L);
+
+        UserFuel.ChargeFromStudyResult result = fuel.chargeFromStudy(25);
+
+        assertThat(result.amount()).isZero();
+        assertThat(result.newPendingMinutes()).isEqualTo(25);
+        assertThat(fuel.getCurrentFuel()).isZero();
+        assertThat(fuel.getTotalCharged()).isZero();
+        assertThat(fuel.getPendingMinutes()).isEqualTo(25);
+    }
+
+    @Test
+    @DisplayName("chargeFromStudy: 90분 → 3연료, pending=0")
+    void chargeFromStudy_multiple_3() {
+        UserFuel fuel = UserFuel.initialize(1L);
+
+        UserFuel.ChargeFromStudyResult result = fuel.chargeFromStudy(90);
+
+        assertThat(result.amount()).isEqualTo(3);
+        assertThat(result.newPendingMinutes()).isZero();
+        assertThat(fuel.getCurrentFuel()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("chargeFromStudy: pending 25 + 20분 → 1연료, pending=15 (잔여분 이월 누적)")
+    void chargeFromStudy_pendingCarriedOver() {
+        UserFuel fuel = UserFuel.initialize(1L);
+        fuel.chargeFromStudy(25);   // pending=25
+
+        UserFuel.ChargeFromStudyResult result = fuel.chargeFromStudy(20);
+
+        assertThat(result.amount()).isEqualTo(1);
+        assertThat(result.newPendingMinutes()).isEqualTo(15);
+        assertThat(fuel.getCurrentFuel()).isEqualTo(1);
+        assertThat(fuel.getPendingMinutes()).isEqualTo(15);
+    }
+
+    @Test
+    @DisplayName("chargeFromStudy: pending 15 + 50분 → 2연료, pending=5")
+    void chargeFromStudy_pendingPlusLargeStudy() {
+        UserFuel fuel = UserFuel.initialize(1L);
+        fuel.chargeFromStudy(25);
+        fuel.chargeFromStudy(20);   // 누적 currentFuel=1, pending=15
+
+        UserFuel.ChargeFromStudyResult result = fuel.chargeFromStudy(50);
+
+        assertThat(result.amount()).isEqualTo(2);
+        assertThat(result.newPendingMinutes()).isEqualTo(5);
+        assertThat(fuel.getCurrentFuel()).isEqualTo(3);  // 0+1+2
+        assertThat(fuel.getTotalCharged()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("chargeFromStudy: studyMinutes<=0이면 INVALID_INPUT_VALUE")
+    void chargeFromStudy_nonPositive_throws() {
+        UserFuel fuel = UserFuel.initialize(1L);
+
+        assertThatThrownBy(() -> fuel.chargeFromStudy(0))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+        assertThatThrownBy(() -> fuel.chargeFromStudy(-5))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+    }
 }

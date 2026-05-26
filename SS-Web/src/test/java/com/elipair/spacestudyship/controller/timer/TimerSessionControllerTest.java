@@ -75,7 +75,7 @@ class TimerSessionControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/timer-sessions — 201, { session, fuelCharged }")
+    @DisplayName("POST /api/timer-sessions — 201, { session, fuelCharged } (90분 → 3연료, 30분=1연료 환산)")
     void create_201() throws Exception {
         TimerSessionResponse sessionRes = new TimerSessionResponse(
                 "sess-1", "todo-1", "수학",
@@ -83,7 +83,7 @@ class TimerSessionControllerTest {
                 Instant.parse("2026-05-25T02:30:00Z"),
                 90);
         given(service.create(eq(1L), any(TimerSessionCreateRequest.class), any()))
-                .willReturn(new TimerSessionCreateResponse(sessionRes, 90));
+                .willReturn(new TimerSessionCreateResponse(sessionRes, 3));
 
         String body = """
                 {
@@ -101,7 +101,7 @@ class TimerSessionControllerTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.session.id").value("sess-1"))
                 .andExpect(jsonPath("$.session.durationMinutes").value(90))
-                .andExpect(jsonPath("$.fuelCharged").value(90));
+                .andExpect(jsonPath("$.fuelCharged").value(3));
     }
 
     @Test
@@ -113,7 +113,7 @@ class TimerSessionControllerTest {
                 Instant.parse("2026-05-25T02:00:00Z"),
                 60);
         given(service.create(eq(1L), any(), eq("idem-abc")))
-                .willReturn(new TimerSessionCreateResponse(sessionRes, 60));
+                .willReturn(new TimerSessionCreateResponse(sessionRes, 2));
 
         String body = """
                 {"startedAt":"2026-05-25T01:00:00Z","endedAt":"2026-05-25T02:00:00Z","durationMinutes":60}

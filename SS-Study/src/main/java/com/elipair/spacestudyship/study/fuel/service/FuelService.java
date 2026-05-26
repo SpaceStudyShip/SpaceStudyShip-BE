@@ -4,6 +4,7 @@ import com.elipair.spacestudyship.common.exception.CustomException;
 import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.study.fuel.constant.FuelReason;
 import com.elipair.spacestudyship.study.fuel.constant.TransactionType;
+import com.elipair.spacestudyship.study.fuel.dto.FuelChargeFromStudyResult;
 import com.elipair.spacestudyship.study.fuel.dto.FuelResponse;
 import com.elipair.spacestudyship.study.fuel.dto.FuelTransactionListResponse;
 import com.elipair.spacestudyship.study.fuel.dto.FuelTransactionResponse;
@@ -130,6 +131,76 @@ public class FuelService {
         log.info("[Fuel] 소비 | userId={}, amount={}, reason={}, txId={}, balanceAfter={}",
                 userId, amount, reason, transactionId, fuel.getCurrentFuel());
         return FuelTransactionResponse.from(tx);
+    }
+
+    /**
+     * 타이머 세션 완료로 인한 연료 충전.
+     *
+     * 환율: 30분 = 1 연료 (잔여분은 {@link UserFuel#pendingMinutes}로 이월).
+     * idempotency 키는 {@code sessionId} (= {@link FuelTransaction#getId()}). 동일 sessionId
+     * 재호출 시 기존 transaction을 그대로 반환하고 잔량은 변경하지 않는다.
+     *
+     * 30분 미만이라 충전 통 수가 0이 나오면 {@code fuel_transactions} INSERT는 건너뛰고
+     * {@code user_fuel.pendingMinutes}만 갱신한다 (transaction-less pending 누적).
+     */
+    @Transactional
+    public FuelChargeFromStudyResult chargeFromStudy(
+            Long userId, int studyMinutes, String sessionId) {
+
+        if (studyMinutes <= 0) throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+
+        Optional<FuelTransaction> existing = transactionRepository.findById(sessionId);
+        if (existing.isPresent()) {
+            return idempotentReturnFromStudy(existing.get(), userId, sessionId);
+        }
+
+        UserFuel fuel = userFuelRepository.findByUserIdForUpdate(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FUEL_NOT_INITIALIZED));
+
+        // 락 획득 후 race 재확인 (다른 트랜잭션이 동일 sessionId로 먼저 INSERT했을 가능성)
+        Optional<FuelTransaction> raced = transactionRepository.findById(sessionId);
+        if (raced.isPresent()) {
+            return idempotentReturnFromStudy(raced.get(), userId, sessionId);
+        }
+
+        UserFuel.ChargeFromStudyResult result = fuel.chargeFromStudy(studyMinutes);
+
+        if (result.amount() > 0) {
+            FuelTransaction tx = FuelTransaction.of(
+                    sessionId, userId, TransactionType.CHARGE,
+                    result.amount(), FuelReason.STUDY_SESSION,
+                    sessionId, fuel.getCurrentFuel());
+            transactionRepository.save(tx);
+        }
+
+        log.info("[Fuel] 공부 세션 충전 | userId={}, studyMinutes={}, amount={}, " +
+                        "pendingMinutes={}, balanceAfter={}, sessionId={}",
+                userId, studyMinutes, result.amount(),
+                result.newPendingMinutes(), fuel.getCurrentFuel(), sessionId);
+        return new FuelChargeFromStudyResult(
+                result.amount(), result.newPendingMinutes(), fuel.getCurrentFuel());
+    }
+
+    private FuelChargeFromStudyResult idempotentReturnFromStudy(
+            FuelTransaction tx, Long userId, String sessionId) {
+        if (!tx.getUserId().equals(userId)) {
+            throw new CustomException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        UserFuel fuel = userFuelRepository.findByUserId(userId)
+                .orElseThrow(() -> new CustomException(ErrorCode.FUEL_NOT_INITIALIZED));
+        log.info("[Fuel] 공부 세션 idempotent skip | userId={}, sessionId={}", userId, sessionId);
+        return new FuelChargeFromStudyResult(
+                tx.getAmount(), fuel.getPendingMinutes(), fuel.getCurrentFuel());
+    }
+
+    /**
+     * 특정 sessionId에 대응하는 충전 transaction의 amount를 조회한다.
+     * Timer 도메인이 dedup 응답을 만들 때 사용 (transaction이 없으면 0).
+     */
+    public int findChargedAmountBySessionId(String sessionId) {
+        return transactionRepository.findById(sessionId)
+                .map(FuelTransaction::getAmount)
+                .orElse(0);
     }
 
     @Transactional

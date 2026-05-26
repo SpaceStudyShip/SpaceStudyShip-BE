@@ -353,4 +353,104 @@ class FuelServiceTest {
                 .isInstanceOf(CustomException.class)
                 .extracting("errorCode").isEqualTo(ErrorCode.FUEL_NOT_INITIALIZED);
     }
+
+    // ---------- chargeFromStudy (30분 = 1연료, 잔여분 이월) ----------
+
+    @Test
+    @DisplayName("chargeFromStudy: 90분 → amount=3, pending=0. fuel_transactions INSERT 1회")
+    void chargeFromStudy_90min_charges3() {
+        UserFuel fuel = UserFuel.initialize(1L);
+        given(transactionRepository.findById("sess-1")).willReturn(Optional.empty());
+        given(userFuelRepository.findByUserIdForUpdate(1L)).willReturn(Optional.of(fuel));
+
+        var result = fuelService.chargeFromStudy(1L, 90, "sess-1");
+
+        assertThat(result.amount()).isEqualTo(3);
+        assertThat(result.newPendingMinutes()).isZero();
+        assertThat(result.currentFuel()).isEqualTo(3);
+        assertThat(fuel.getCurrentFuel()).isEqualTo(3);
+        assertThat(fuel.getPendingMinutes()).isZero();
+
+        ArgumentCaptor<FuelTransaction> cap = ArgumentCaptor.forClass(FuelTransaction.class);
+        verify(transactionRepository).save(cap.capture());
+        FuelTransaction tx = cap.getValue();
+        assertThat(tx.getId()).isEqualTo("sess-1");
+        assertThat(tx.getAmount()).isEqualTo(3);
+        assertThat(tx.getType()).isEqualTo(TransactionType.CHARGE);
+        assertThat(tx.getReason()).isEqualTo(FuelReason.STUDY_SESSION);
+        assertThat(tx.getReferenceId()).isEqualTo("sess-1");
+    }
+
+    @Test
+    @DisplayName("chargeFromStudy: 25분 → amount=0, pending=25. transaction 미생성 (pending만 누적)")
+    void chargeFromStudy_25min_noTransactionPendingOnly() {
+        UserFuel fuel = UserFuel.initialize(1L);
+        given(transactionRepository.findById("sess-1")).willReturn(Optional.empty());
+        given(userFuelRepository.findByUserIdForUpdate(1L)).willReturn(Optional.of(fuel));
+
+        var result = fuelService.chargeFromStudy(1L, 25, "sess-1");
+
+        assertThat(result.amount()).isZero();
+        assertThat(result.newPendingMinutes()).isEqualTo(25);
+        assertThat(result.currentFuel()).isZero();
+        assertThat(fuel.getPendingMinutes()).isEqualTo(25);
+
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("chargeFromStudy: 동일 sessionId 재호출 → idempotent skip, fuel 변경 없음")
+    void chargeFromStudy_idempotent() {
+        UserFuel fuel = UserFuel.initialize(1L);
+        fuel.charge(3);   // 사전 상태: 이미 3연료 있음
+        FuelTransaction existing = FuelTransaction.of(
+                "sess-1", 1L, TransactionType.CHARGE, 3,
+                FuelReason.STUDY_SESSION, "sess-1", 3);
+        given(transactionRepository.findById("sess-1")).willReturn(Optional.of(existing));
+        given(userFuelRepository.findByUserId(1L)).willReturn(Optional.of(fuel));
+
+        var result = fuelService.chargeFromStudy(1L, 90, "sess-1");
+
+        assertThat(result.amount()).isEqualTo(3);
+        assertThat(result.currentFuel()).isEqualTo(3);
+        verify(userFuelRepository, never()).findByUserIdForUpdate(any());
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("chargeFromStudy: studyMinutes<=0 → INVALID_INPUT_VALUE")
+    void chargeFromStudy_nonPositive_throws() {
+        assertThatThrownBy(() -> fuelService.chargeFromStudy(1L, 0, "sess-1"))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+        assertThatThrownBy(() -> fuelService.chargeFromStudy(1L, -5, "sess-1"))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+    }
+
+    @Test
+    @DisplayName("chargeFromStudy: UserFuel 미초기화 시 FUEL_NOT_INITIALIZED")
+    void chargeFromStudy_fuelNotInitialized_throws() {
+        given(transactionRepository.findById("sess-1")).willReturn(Optional.empty());
+        given(userFuelRepository.findByUserIdForUpdate(1L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> fuelService.chargeFromStudy(1L, 60, "sess-1"))
+                .isInstanceOf(CustomException.class)
+                .extracting("errorCode").isEqualTo(ErrorCode.FUEL_NOT_INITIALIZED);
+    }
+
+    // ---------- findChargedAmountBySessionId ----------
+
+    @Test
+    @DisplayName("findChargedAmountBySessionId: transaction 있으면 amount, 없으면 0")
+    void findChargedAmountBySessionId() {
+        FuelTransaction tx = FuelTransaction.of(
+                "sess-1", 1L, TransactionType.CHARGE, 3,
+                FuelReason.STUDY_SESSION, "sess-1", 3);
+        given(transactionRepository.findById("sess-1")).willReturn(Optional.of(tx));
+        given(transactionRepository.findById("sess-2")).willReturn(Optional.empty());
+
+        assertThat(fuelService.findChargedAmountBySessionId("sess-1")).isEqualTo(3);
+        assertThat(fuelService.findChargedAmountBySessionId("sess-2")).isZero();
+    }
 }
