@@ -235,7 +235,7 @@ class TimerSessionControllerTest {
     @DisplayName("GET /api/timer-sessions/today-stats — 200")
     void todayStats_200() throws Exception {
         given(service.getTodayStats(1L))
-                .willReturn(new TodayStatsResponse(180, 3, 7));
+                .willReturn(new TodayStatsResponse(180, 3, 7, 12450, 287, 1820));
 
         mockMvc.perform(get("/api/timer-sessions/today-stats"))
                 .andExpect(status().isOk())

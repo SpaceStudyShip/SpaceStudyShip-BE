@@ -324,7 +324,7 @@ class TimerSessionServiceTest {
 
         TodayStatsResponse res = service.getTodayStats(1L);
 
-        assertThat(res).isEqualTo(new TodayStatsResponse(0, 0, 0));
+        assertThat(res).isEqualTo(new TodayStatsResponse(0, 0, 0, 0, 0, 0));
     }
 
     @Test

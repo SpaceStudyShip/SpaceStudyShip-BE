@@ -180,7 +180,8 @@ public class TimerSessionService {
                 .findStartedAtsAfter(userId, lookbackStart);
 
         int streak = computeStreak(startedAts, todayKst);
-        return new TodayStatsResponse(Math.toIntExact(totalMinutes), (int) sessionCount, streak);
+        // Task 3에서 lifetime/monthly 합산 로직으로 교체 — 현재는 컴파일 유지용 0 주입
+        return new TodayStatsResponse(Math.toIntExact(totalMinutes), (int) sessionCount, streak, 0, 0, 0);
     }
 
     private LocalDateTime toUtcLdt(ZonedDateTime kst) {
