@@ -2,7 +2,7 @@ package com.elipair.spacestudyship.study.timer.service;
 
 import com.elipair.spacestudyship.common.exception.CustomException;
 import com.elipair.spacestudyship.common.exception.ErrorCode;
-import com.elipair.spacestudyship.study.fuel.constant.FuelReason;
+import com.elipair.spacestudyship.study.fuel.dto.FuelChargeFromStudyResult;
 import com.elipair.spacestudyship.study.fuel.service.FuelService;
 import com.elipair.spacestudyship.study.timer.dto.*;
 import com.elipair.spacestudyship.study.timer.entity.TimerSession;
@@ -61,7 +61,8 @@ public class TimerSessionService {
             if (existing.isPresent()) {
                 log.info("[Timer] idempotent skip | userId={}, key={}, sessionId={}",
                         userId, normalizedKey, existing.get().getId());
-                return buildResponse(existing.get(), existing.get().getDurationMinutes());
+                int existingFuelCharged = fuelService.findChargedAmountBySessionId(existing.get().getId());
+                return buildResponse(existing.get(), existingFuelCharged);
             }
         }
 
@@ -88,21 +89,26 @@ public class TimerSessionService {
                 if (raced.isPresent()) {
                     log.info("[Timer] idempotent race resolved | userId={}, key={}",
                             userId, normalizedKey);
-                    return buildResponse(raced.get(), raced.get().getDurationMinutes());
+                    int racedFuelCharged = fuelService.findChargedAmountBySessionId(raced.get().getId());
+                    return buildResponse(raced.get(), racedFuelCharged);
                 }
             }
             throw e;
         }
 
-        int fuelCharged = request.durationMinutes();
-        fuelService.charge(userId, fuelCharged, FuelReason.STUDY_SESSION, sessionId, sessionId);
+        // 30분 = 1연료 환산. 잔여분은 user_fuel.pendingMinutes에 이월되어 다음 세션과 합산.
+        FuelChargeFromStudyResult fuelResult = fuelService.chargeFromStudy(
+                userId, request.durationMinutes(), sessionId);
+        int fuelCharged = fuelResult.amount();
 
+        // Todo actualMinutes는 실제 공부 분(durationMinutes)으로 누적 (연료 환산과 무관)
         if (request.todoId() != null) {
-            todoService.addActualMinutes(userId, request.todoId(), fuelCharged);
+            todoService.addActualMinutes(userId, request.todoId(), request.durationMinutes());
         }
 
-        log.info("[Timer] 세션 저장 | userId={}, sessionId={}, duration={}분, todoId={}",
-                userId, sessionId, fuelCharged, request.todoId());
+        log.info("[Timer] 세션 저장 | userId={}, sessionId={}, studyMinutes={}, fuelCharged={}, pendingMinutes={}, todoId={}",
+                userId, sessionId, request.durationMinutes(), fuelCharged,
+                fuelResult.newPendingMinutes(), request.todoId());
         return buildResponse(session, fuelCharged);
     }
 

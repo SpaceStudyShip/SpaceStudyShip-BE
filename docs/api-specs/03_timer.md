@@ -155,14 +155,14 @@ GET /api/timer-sessions?todoId=todo-uuid-5678
     "endedAt": "2026-04-16T10:30:00Z",
     "durationMinutes": 90
   },
-  "fuelCharged": 90
+  "fuelCharged": 3
 }
 ```
 
 | 필드 | 타입 | 설명 |
 |------|------|------|
 | `session` | Object | 저장된 세션 (서버 생성 ID 포함) |
-| `fuelCharged` | Integer | 서버에서 검증 후 실제 충전된 연료량 |
+| `fuelCharged` | Integer | 서버에서 검증 후 실제 충전된 연료 **통 수** (30분=1연료 환산 결과). 30분 미만은 0 가능 |
 
 ### Error
 
@@ -183,16 +183,31 @@ GET /api/timer-sessions?todoId=todo-uuid-5678
 4. startedAt이 미래가 아닌지 확인
 5. 검증 통과 시:
    - 세션 DB 저장
-   - 연료 충전: fuelCharged = durationMinutes (1분 = 1연료)
-   - Fuel 거래 내역 생성 (type: charge, reason: STUDY_SESSION, referenceId: sessionId)
-6. Todo에 actualMinutes 누적 업데이트 (todoId가 있는 경우)
+   - 연료 충전: 30분 단위로 끊어서 충전, 잔여분은 pendingMinutes에 이월
+   - Fuel 거래 내역 생성 (단, 충전 amount > 0 일 때만 INSERT — 30분 미만이면 transaction 없음)
+   - type: charge, reason: STUDY_SESSION, referenceId: sessionId
+6. Todo에 actualMinutes 누적 업데이트 (todoId가 있는 경우, studyMinutes 그대로 누적)
 ```
 
 ### 연료 충전 규칙
 
-- 기본: **1분 공부 = 1 연료**
-- 서버에서 `durationMinutes`를 재검증하여 충전량 결정
-- 클라이언트가 보낸 값과 서버 계산값이 다를 수 있음 (조작 방지)
+- 환율: **30분 공부 = 1 연료** (정수 절삭)
+- **잔여분 이월**: 30분 미만 잔여 분은 `user_fuel.pendingMinutes`에 누적되어 다음 세션과 합산
+- `fuelCharged` 응답값은 이번 호출로 새로 충전된 통 수 (0 가능)
+- 서버에서 `durationMinutes`를 재검증하여 충전량 결정 (조작 방지)
+
+#### 환산 예시 (사용자 누적)
+
+| 호출 | 이번 세션 | 직전 pending | 이번 totalMinutes | fuelCharged(amount) | newPending | 누적 currentFuel |
+|------|-----------|--------------|-------------------|---------------------|------------|------------------|
+| 1 | 25분 | 0 | 25 | **0** | 25 | 0 |
+| 2 | 20분 | 25 | 45 | **1** | 15 | 1 |
+| 3 | 50분 | 15 | 65 | **2** | 5 | 3 |
+| 4 | 90분 | 5 | 95 | **3** | 5 | 6 |
+
+#### Todo `actualMinutes` 누적
+- 연료 환산과 무관하게 **실제 공부 분(`durationMinutes`)을 그대로 누적**
+- "내가 오늘 73분 공부했다"는 사용자 인지값을 손실 없이 보존
 
 ---
 

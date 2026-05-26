@@ -2,7 +2,7 @@ package com.elipair.spacestudyship.study.timer.service;
 
 import com.elipair.spacestudyship.common.exception.CustomException;
 import com.elipair.spacestudyship.common.exception.ErrorCode;
-import com.elipair.spacestudyship.study.fuel.constant.FuelReason;
+import com.elipair.spacestudyship.study.fuel.dto.FuelChargeFromStudyResult;
 import com.elipair.spacestudyship.study.fuel.service.FuelService;
 import com.elipair.spacestudyship.study.timer.dto.TimerSessionCreateRequest;
 import com.elipair.spacestudyship.study.timer.dto.TimerSessionCreateResponse;
@@ -139,15 +139,20 @@ class TimerSessionServiceTest {
                 Instant.parse("2026-05-25T12:05:00Z"),
                 Instant.parse("2026-05-25T13:00:00Z"),
                 30);
+        given(fuelService.chargeFromStudy(eq(1L), eq(30), anyString()))
+                .willReturn(new FuelChargeFromStudyResult(1, 0, 1));
 
         TimerSessionCreateResponse res = service.create(1L, req, null);
         assertThat(res.session().durationMinutes()).isEqualTo(30);
     }
 
     @Test
-    @DisplayName("create 정상: 세션 저장 + Fuel 충전 + (todoId 없으므로) Todo 미호출")
+    @DisplayName("create 정상: 세션 저장 + Fuel chargeFromStudy(60분 → 2연료) + (todoId 없으므로) Todo 미호출")
     void create_noTodo_chargesFuel_doesNotTouchTodo() {
         TimerSessionCreateRequest req = validRequest(60);
+        // 60분 = 2연료 (30분=1연료 환산), pending 0
+        given(fuelService.chargeFromStudy(eq(1L), eq(60), anyString()))
+                .willReturn(new FuelChargeFromStudyResult(2, 0, 2));
 
         TimerSessionCreateResponse res = service.create(1L, req, null);
 
@@ -160,24 +165,43 @@ class TimerSessionServiceTest {
         assertThat(saved.getIdempotencyKey()).isNull();
         assertThat(saved.getId()).isNotBlank();
 
-        verify(fuelService).charge(
-                eq(1L), eq(60), eq(FuelReason.STUDY_SESSION),
-                eq(saved.getId()), eq(saved.getId()));
+        verify(fuelService).chargeFromStudy(eq(1L), eq(60), eq(saved.getId()));
 
         verifyNoInteractions(todoService);
 
-        assertThat(res.fuelCharged()).isEqualTo(60);
+        assertThat(res.fuelCharged()).isEqualTo(2);
         assertThat(res.session().id()).isEqualTo(saved.getId());
     }
 
     @Test
-    @DisplayName("create 정상: todoId 있으면 TodoService.addActualMinutes 호출")
+    @DisplayName("create 정상: 25분 세션 → fuelCharged=0 (pending 누적), Todo는 25분 그대로 누적")
+    void create_under30Min_noFuelChargedButPendingAccumulated() {
+        TimerSessionCreateRequest req = new TimerSessionCreateRequest(
+                "todo-1", "수학",
+                Instant.parse("2026-05-25T01:00:00Z"),
+                Instant.parse("2026-05-25T01:25:00Z"),
+                25);
+        // 25분 → amount=0, pending=25 (30분 미만이라 fuel transaction 생성 안 됨)
+        given(fuelService.chargeFromStudy(eq(1L), eq(25), anyString()))
+                .willReturn(new FuelChargeFromStudyResult(0, 25, 0));
+
+        TimerSessionCreateResponse res = service.create(1L, req, null);
+
+        assertThat(res.fuelCharged()).isZero();
+        // Todo는 실제 공부 분 그대로 누적 (연료 환산과 무관)
+        verify(todoService).addActualMinutes(eq(1L), eq("todo-1"), eq(25));
+    }
+
+    @Test
+    @DisplayName("create 정상: todoId 있으면 TodoService.addActualMinutes 호출 (studyMinutes 그대로)")
     void create_withTodo_callsAddActualMinutes() {
         TimerSessionCreateRequest req = new TimerSessionCreateRequest(
                 "todo-1", "수학",
                 Instant.parse("2026-05-25T01:00:00Z"),
                 Instant.parse("2026-05-25T02:00:00Z"),
                 60);
+        given(fuelService.chargeFromStudy(eq(1L), eq(60), anyString()))
+                .willReturn(new FuelChargeFromStudyResult(2, 0, 2));
 
         service.create(1L, req, null);
 
@@ -185,7 +209,7 @@ class TimerSessionServiceTest {
     }
 
     @Test
-    @DisplayName("Idempotency-Key dedup: 동일 키 재요청 시 기존 세션 반환, fuel/todo 호출 0회")
+    @DisplayName("Idempotency-Key dedup: 동일 키 재요청 시 기존 세션 반환 + fuel transaction 조회로 fuelCharged 복구")
     void idempotency_dedup_returnsExisting() {
         TimerSession existing = TimerSession.of(
                 "existing-id", 1L, null, null,
@@ -194,19 +218,25 @@ class TimerSessionServiceTest {
                 60, "idem-1");
         given(sessionRepository.findByUserIdAndIdempotencyKey(1L, "idem-1"))
                 .willReturn(Optional.of(existing));
+        // dedup 시 fuelCharged는 기존 fuel transaction 조회로 복구 (60분 → 2연료)
+        given(fuelService.findChargedAmountBySessionId("existing-id")).willReturn(2);
 
         TimerSessionCreateResponse res = service.create(1L, validRequest(60), "idem-1");
 
         verify(sessionRepository, never()).saveAndFlush(any());
-        verifyNoInteractions(fuelService);
+        // chargeFromStudy는 호출 안 됨 (실제 충전·중복 차단)
+        verify(fuelService, never()).chargeFromStudy(anyLong(), anyInt(), anyString());
         verifyNoInteractions(todoService);
         assertThat(res.session().id()).isEqualTo("existing-id");
-        assertThat(res.fuelCharged()).isEqualTo(60);
+        assertThat(res.fuelCharged()).isEqualTo(2);
     }
 
     @Test
     @DisplayName("Idempotency-Key 정규화: blank → null로 취급 (dedup 안 함)")
     void idempotency_blank_normalizedToNull() {
+        given(fuelService.chargeFromStudy(eq(1L), eq(60), anyString()))
+                .willReturn(new FuelChargeFromStudyResult(2, 0, 2));
+
         service.create(1L, validRequest(60), "   ");
 
         verify(sessionRepository, never()).findByUserIdAndIdempotencyKey(anyLong(), any());
@@ -216,7 +246,7 @@ class TimerSessionServiceTest {
     }
 
     @Test
-    @DisplayName("Idempotency race: saveAndFlush 시 DataIntegrityViolation → 재조회 후 기존 반환")
+    @DisplayName("Idempotency race: saveAndFlush 시 DataIntegrityViolation → 재조회 후 기존 반환 + fuel transaction 조회")
     void idempotency_race_resolvedByReSelect() {
         given(sessionRepository.findByUserIdAndIdempotencyKey(1L, "idem-1"))
                 .willReturn(Optional.empty())
@@ -227,11 +257,14 @@ class TimerSessionServiceTest {
                         60, "idem-1")));
         given(sessionRepository.saveAndFlush(any(TimerSession.class)))
                 .willThrow(new DataIntegrityViolationException("unique violation"));
+        given(fuelService.findChargedAmountBySessionId("racer-id")).willReturn(2);
 
         TimerSessionCreateResponse res = service.create(1L, validRequest(60), "idem-1");
 
         assertThat(res.session().id()).isEqualTo("racer-id");
-        verifyNoInteractions(fuelService);
+        assertThat(res.fuelCharged()).isEqualTo(2);
+        // race 복구 후에는 신규 chargeFromStudy 호출 안 함
+        verify(fuelService, never()).chargeFromStudy(anyLong(), anyInt(), anyString());
         verifyNoInteractions(todoService);
     }
 
