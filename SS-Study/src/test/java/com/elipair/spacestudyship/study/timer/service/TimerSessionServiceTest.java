@@ -448,21 +448,25 @@ class TimerSessionServiceTest {
     }
 
     @Test
-    @DisplayName("today-stats: lifetime 0건 → 3 필드 모두 0 (null 금지)")
-    void todayStats_lifetimeZero_returnsZeroNotNull() {
-        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(0L);
+    @DisplayName("today-stats: 레포가 null 반환해도 (방어적) → lifetimeMinutes/monthlyMinutes 모두 0 (null 금지)")
+    void todayStats_repoReturnsNull_serviceWrapsToZero() {
+        // 실제 레포는 COALESCE(SUM, 0L)로 NULL을 막지만, Service 측 Optional.ofNullable.orElse 가드가
+        // 실제로 동작하는지 검증한다 (방어 계층 회귀 방지). sumDurationBetween/sumDurationByUserId가
+        // null을 반환한 경우에도 응답 필드는 0이어야 한다.
+        given(sessionRepository.sumDurationBetween(eq(1L), any(), any())).willReturn(null);
         given(sessionRepository
                 .countByUserIdAndStartedAtGreaterThanEqualAndStartedAtLessThan(eq(1L), any(), any()))
                 .willReturn(0L);
         given(sessionRepository.findStartedAtsAfter(eq(1L), any())).willReturn(List.of());
-        given(sessionRepository.sumDurationByUserId(eq(1L))).willReturn(0L);
+        given(sessionRepository.sumDurationByUserId(eq(1L))).willReturn(null);
         given(sessionRepository.countByUserId(eq(1L))).willReturn(0L);
 
         TodayStatsResponse res = service.getTodayStats(1L);
 
+        assertThat(res.totalMinutes()).isNotNull().isZero();
+        assertThat(res.monthlyMinutes()).isNotNull().isZero();
         assertThat(res.lifetimeMinutes()).isNotNull().isZero();
         assertThat(res.lifetimeSessionCount()).isNotNull().isZero();
-        assertThat(res.monthlyMinutes()).isNotNull().isZero();
     }
 
     @Test
