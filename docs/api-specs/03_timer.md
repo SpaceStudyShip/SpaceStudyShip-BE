@@ -223,21 +223,34 @@ GET /api/timer-sessions?todoId=todo-uuid-5678
 
 ### Response
 
-**200 OK**
+`200 OK`
+
+| 필드 | 타입 | Nullable | 설명 |
+|------|------|----------|------|
+| `totalMinutes` | Integer | X | 오늘 총 공부 시간 (분, KST) |
+| `sessionCount` | Integer | X | 오늘 완료한 세션 수 |
+| `streak` | Integer | X | 연속 공부 일수 (오늘 포함, KST 기준) |
+| `lifetimeMinutes` | Integer | X | 회원의 전체 누적 공부 시간 (분) |
+| `lifetimeSessionCount` | Integer | X | 회원의 전체 세션 수 |
+| `monthlyMinutes` | Integer | X | 이번 달 누적 공부 시간 (분, KST 기준) |
+
+> 세션 0건 회원도 6필드 모두 `0`을 반환합니다. `null` 절대 반환하지 않습니다.
 
 ```json
 {
   "totalMinutes": 180,
   "sessionCount": 3,
-  "streak": 7
+  "streak": 7,
+  "lifetimeMinutes": 12450,
+  "lifetimeSessionCount": 287,
+  "monthlyMinutes": 1820
 }
 ```
 
-| 필드 | 타입 | 설명 |
-|------|------|------|
-| `totalMinutes` | Integer | 오늘 총 공부 시간 (분) |
-| `sessionCount` | Integer | 오늘 완료한 세션 수 |
-| `streak` | Integer | 연속 공부 일수 (오늘 포함) |
+#### 시간 경계 정의
+- **오늘**: `KST 00:00:00` ~ `KST 23:59:59`
+- **이번 달**: 이번 달 1일 `KST 00:00:00` ~ 다음 달 1일 `KST 00:00:00` (반열림 `[start, end)`)
+- **streak**: 마지막 공부일이 오늘이면 오늘 포함, 어제까지만 했으면 어제 기준. KST 기준 일자 단위 연속.
 
 ### 연속 일수 (Streak) 계산 로직
 
