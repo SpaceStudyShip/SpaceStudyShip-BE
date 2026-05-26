@@ -137,11 +137,22 @@ public class FuelService {
      * 타이머 세션 완료로 인한 연료 충전.
      *
      * 환율: 30분 = 1 연료 (잔여분은 {@link UserFuel#pendingMinutes}로 이월).
-     * idempotency 키는 {@code sessionId} (= {@link FuelTransaction#getId()}). 동일 sessionId
-     * 재호출 시 기존 transaction을 그대로 반환하고 잔량은 변경하지 않는다.
      *
-     * 30분 미만이라 충전 통 수가 0이 나오면 {@code fuel_transactions} INSERT는 건너뛰고
-     * {@code user_fuel.pendingMinutes}만 갱신한다 (transaction-less pending 누적).
+     * <h3>Idempotency 계약</h3>
+     * Idempotency 키는 {@code sessionId} (= {@link FuelTransaction#getId()}).
+     * <ul>
+     *   <li><b>amount &gt; 0 (30분 이상 합산)</b>: 동일 sessionId 재호출 시 기존
+     *       {@code fuel_transactions} row를 조회해 idempotent skip한다.
+     *       잔량/pending 변경 없음.</li>
+     *   <li><b>amount = 0 (30분 미만 합산)</b>: {@code fuel_transactions} INSERT가 발생하지
+     *       않으므로 fuel-side에서 idempotency를 보장하지 못한다.
+     *       <b>호출자는 sessionId의 유일성을 직접 보장해야 한다</b> (예: timer-side의
+     *       {@code Idempotency-Key} 헤더 기반 dedup + 매 호출 신규 UUID 생성).
+     *       동일 sessionId 재호출 시 {@code pendingMinutes}가 중복 누적된다.</li>
+     * </ul>
+     *
+     * 현재 단일 호출자({@code TimerSessionService.create})가 매 호출마다 신규 UUID를 생성하므로
+     * 위 amount=0 시나리오는 발생하지 않는다. 향후 직접 호출자를 추가할 때는 이 계약을 확인하라.
      */
     @Transactional
     public FuelChargeFromStudyResult chargeFromStudy(
@@ -165,6 +176,10 @@ public class FuelService {
 
         UserFuel.ChargeFromStudyResult result = fuel.chargeFromStudy(studyMinutes);
 
+        // amount=0이면 transaction을 만들지 않는다 — pending만 갱신.
+        // fuel_transactions의 chk_fuel_tx_amount_positive 제약으로 amount=0 INSERT 불가능하기도 하고,
+        // 거래 내역(GET /api/fuel/transactions)에 0연료 노이즈 row 노출을 피하기 위함.
+        // 대신 sessionId 유일성은 호출자(TimerSessionService)가 보장해야 한다. (위 Javadoc 참조)
         if (result.amount() > 0) {
             FuelTransaction tx = FuelTransaction.of(
                     sessionId, userId, TransactionType.CHARGE,
