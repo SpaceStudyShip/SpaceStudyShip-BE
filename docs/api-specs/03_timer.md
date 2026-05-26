@@ -223,7 +223,7 @@ GET /api/timer-sessions?todoId=todo-uuid-5678
 
 ### Response
 
-`200 OK`
+**200 OK**
 
 | 필드 | 타입 | Nullable | 설명 |
 |------|------|----------|------|
