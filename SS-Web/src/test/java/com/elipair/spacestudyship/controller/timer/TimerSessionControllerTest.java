@@ -255,8 +255,11 @@ class TimerSessionControllerTest {
 
         mockMvc.perform(get("/api/timer-sessions/today-stats"))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lifetimeMinutes").isNumber())
                 .andExpect(jsonPath("$.lifetimeMinutes").value(0))
+                .andExpect(jsonPath("$.lifetimeSessionCount").isNumber())
                 .andExpect(jsonPath("$.lifetimeSessionCount").value(0))
+                .andExpect(jsonPath("$.monthlyMinutes").isNumber())
                 .andExpect(jsonPath("$.monthlyMinutes").value(0));
     }
 }
