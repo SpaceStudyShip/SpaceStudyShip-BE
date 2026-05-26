@@ -48,4 +48,12 @@ public interface TimerSessionRepository extends JpaRepository<TimerSession, Stri
            "WHERE s.userId = :userId AND s.startedAt >= :start")
     List<LocalDateTime> findStartedAtsAfter(@Param("userId") Long userId,
                                             @Param("start") LocalDateTime start);
+
+    // 전체 누적 분: SUM(Integer) → Long, COALESCE로 NULL 방지
+    @Query("SELECT COALESCE(SUM(s.durationMinutes), 0L) FROM TimerSession s " +
+           "WHERE s.userId = :userId")
+    Long sumDurationByUserId(@Param("userId") Long userId);
+
+    // 전체 세션 수: Spring Data 명명 규칙
+    long countByUserId(Long userId);
 }
