@@ -232,15 +232,34 @@ class TimerSessionControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/timer-sessions/today-stats — 200")
+    @DisplayName("GET /api/timer-sessions/today-stats — 200, 6필드 (today + lifetime + monthly)")
     void todayStats_200() throws Exception {
         given(service.getTodayStats(1L))
-                .willReturn(new TodayStatsResponse(180, 3, 7));
+                .willReturn(new TodayStatsResponse(180, 3, 7, 12450, 287, 1820));
 
         mockMvc.perform(get("/api/timer-sessions/today-stats"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.totalMinutes").value(180))
                 .andExpect(jsonPath("$.sessionCount").value(3))
-                .andExpect(jsonPath("$.streak").value(7));
+                .andExpect(jsonPath("$.streak").value(7))
+                .andExpect(jsonPath("$.lifetimeMinutes").value(12450))
+                .andExpect(jsonPath("$.lifetimeSessionCount").value(287))
+                .andExpect(jsonPath("$.monthlyMinutes").value(1820));
+    }
+
+    @Test
+    @DisplayName("GET /api/timer-sessions/today-stats — 0건 회원: 신규 3필드도 0 (null 아님)")
+    void todayStats_zero_neverNull() throws Exception {
+        given(service.getTodayStats(1L))
+                .willReturn(new TodayStatsResponse(0, 0, 0, 0, 0, 0));
+
+        mockMvc.perform(get("/api/timer-sessions/today-stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lifetimeMinutes").isNumber())
+                .andExpect(jsonPath("$.lifetimeMinutes").value(0))
+                .andExpect(jsonPath("$.lifetimeSessionCount").isNumber())
+                .andExpect(jsonPath("$.lifetimeSessionCount").value(0))
+                .andExpect(jsonPath("$.monthlyMinutes").isNumber())
+                .andExpect(jsonPath("$.monthlyMinutes").value(0));
     }
 }

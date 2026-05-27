@@ -129,13 +129,32 @@ public class TimerSessionController {
                 loginMember.memberId(), startDate, endDate, todoId, page, size));
     }
 
-    @Operation(summary = "오늘 공부 통계",
-            description = "KST(Asia/Seoul) 기준 오늘의 총 분 / 세션 수 / 연속 일수(streak)")
+    @Operation(summary = "오늘 공부 통계 + 누적 통계",
+            description = """
+                KST(Asia/Seoul) 기준 통계.
+
+                ### 응답 필드
+                - `totalMinutes`, `sessionCount`: 오늘 (KST)
+                - `streak`: 연속 공부 일수 (오늘 포함, KST)
+                - `lifetimeMinutes`, `lifetimeSessionCount`: 회원의 전체 누적
+                - `monthlyMinutes`: 이번 달 누적 (KST 1일 00:00 ~ 다음 달 1일 00:00)
+
+                세션 0건 회원도 6개 필드 모두 `0`을 반환합니다 (null 금지).
+                """)
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "조회 성공",
                     content = @Content(mediaType = "application/json",
                             schema = @Schema(implementation = TodayStatsResponse.class),
-                            examples = @ExampleObject(value = "{\"totalMinutes\":180,\"sessionCount\":3,\"streak\":7}"))),
+                            examples = @ExampleObject(value = """
+                                    {
+                                      "totalMinutes": 180,
+                                      "sessionCount": 3,
+                                      "streak": 7,
+                                      "lifetimeMinutes": 12450,
+                                      "lifetimeSessionCount": 287,
+                                      "monthlyMinutes": 1820
+                                    }
+                                    """))),
             @ApiResponse(responseCode = "401", description = "인증 필요")
     })
     @GetMapping("/today-stats")

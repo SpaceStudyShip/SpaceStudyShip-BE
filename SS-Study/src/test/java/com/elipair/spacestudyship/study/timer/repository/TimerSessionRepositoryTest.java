@@ -189,4 +189,30 @@ class TimerSessionRepositoryTest {
 
         assertThat(dates).hasSize(2);
     }
+
+    @Test
+    @DisplayName("sumDurationByUserId: 본인 전체 합산, 다른 user 제외, 빈 결과는 0")
+    void sumDurationByUserId() {
+        repository.saveAndFlush(session(1L, LocalDateTime.parse("2026-04-10T01:00:00"), 30, null, null));
+        repository.saveAndFlush(session(1L, LocalDateTime.parse("2026-05-01T01:00:00"), 60, null, null));
+        repository.saveAndFlush(session(1L, LocalDateTime.parse("2026-05-25T01:00:00"), 90, null, null));
+        repository.saveAndFlush(session(2L, LocalDateTime.parse("2026-05-25T01:00:00"), 120, null, null));
+
+        assertThat(repository.sumDurationByUserId(1L)).isEqualTo(180L);
+        assertThat(repository.sumDurationByUserId(2L)).isEqualTo(120L);
+        assertThat(repository.sumDurationByUserId(999L)).isZero();
+    }
+
+    @Test
+    @DisplayName("countByUserId: 본인 세션 수, 다른 user 제외, 빈 결과는 0")
+    void countByUserId() {
+        repository.saveAndFlush(session(1L, LocalDateTime.parse("2026-05-23T01:00:00"), 30, null, null));
+        repository.saveAndFlush(session(1L, LocalDateTime.parse("2026-05-24T01:00:00"), 30, null, null));
+        repository.saveAndFlush(session(1L, LocalDateTime.parse("2026-05-25T01:00:00"), 30, null, null));
+        repository.saveAndFlush(session(2L, LocalDateTime.parse("2026-05-25T01:00:00"), 30, null, null));
+
+        assertThat(repository.countByUserId(1L)).isEqualTo(3);
+        assertThat(repository.countByUserId(2L)).isEqualTo(1);
+        assertThat(repository.countByUserId(999L)).isZero();
+    }
 }
