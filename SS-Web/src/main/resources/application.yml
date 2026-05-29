@@ -12,6 +12,9 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    # 기존 비어있지 않은 DB(Hibernate가 생성)에서 baseline 기본값(1)이 0.0.x 마이그레이션을
+    # 건너뛰는 것을 방지 — 0으로 두어 0.0.31~ 모든 마이그레이션이 적용되게 한다.
+    baseline-version: 0
     locations: classpath:db/migration
     validate-on-migrate: false
 
