@@ -16,7 +16,8 @@ dependencies {
 	api 'org.springframework.boot:spring-boot-starter-actuator'
 	api 'org.springframework.boot:spring-boot-starter-security'
 
-	// Flyway
+	// Flyway (Spring Boot 4: autoconfiguration이 spring-boot-flyway 모듈로 분리됨 — 없으면 마이그레이션 미실행)
+	api 'org.springframework.boot:spring-boot-flyway'
 	api 'org.flywaydb:flyway-core'
 	api 'org.flywaydb:flyway-database-postgresql'
 
