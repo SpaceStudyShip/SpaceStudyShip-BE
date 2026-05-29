@@ -199,4 +199,82 @@ class ExplorationServiceTest {
         assertThatThrownBy(() -> service.unlockRegion(1L, "nope"))
                 .isInstanceOf(CustomException.class);
     }
+
+    @Test
+    @DisplayName("unlockPlanet: 선행 행성 클리어 시 정상 해금")
+    void unlockPlanet_success() {
+        given(nodeRepository.findById("mercury"))
+                .willReturn(Optional.of(planet("mercury", 3, "earth", 1)));
+        given(userExplorationRepository.existsByUserIdAndNodeId(1L, "mercury")).willReturn(false);
+        given(nodeRepository.findByParentIdOrderBySortOrderAsc("earth"))
+                .willReturn(List.of(region("korea", "earth", 0, 0)));
+        given(userExplorationRepository.findByUserId(1L))
+                .willReturn(List.of(UserExploration.unlock(1L, "korea", true)));
+        given(fuelService.getFuel(1L)).willReturn(fuel(100));
+        given(fuelService.consume(eq(1L), eq(3), eq(FuelReason.EXPLORATION_UNLOCK), eq("mercury"), anyString()))
+                .willReturn(tx(3, 97));
+        given(userExplorationRepository.save(any(UserExploration.class)))
+                .willAnswer(inv -> inv.getArgument(0));
+
+        var result = service.unlockPlanet(1L, "mercury");
+
+        assertThat(result.planet().id()).isEqualTo("mercury");
+        assertThat(result.planet().isCleared()).isFalse();
+        assertThat(result.fuelConsumed()).isEqualTo(3);
+        assertThat(result.currentFuel()).isEqualTo(97);
+    }
+
+    @Test
+    @DisplayName("unlockPlanet: 선행 미클리어 → PREREQUISITE_NOT_CLEARED + consume 미호출")
+    void unlockPlanet_prerequisiteNotCleared() {
+        given(nodeRepository.findById("mercury"))
+                .willReturn(Optional.of(planet("mercury", 3, "earth", 1)));
+        given(userExplorationRepository.existsByUserIdAndNodeId(1L, "mercury")).willReturn(false);
+        given(nodeRepository.findByParentIdOrderBySortOrderAsc("earth"))
+                .willReturn(List.of(region("korea", "earth", 0, 0), region("japan", "earth", 1, 1)));
+        given(userExplorationRepository.findByUserId(1L))
+                .willReturn(List.of(UserExploration.unlock(1L, "korea", true))); // 1/2만
+
+        assertThatThrownBy(() -> service.unlockPlanet(1L, "mercury"))
+                .isInstanceOf(CustomException.class);
+        verify(fuelService, never()).consume(any(), anyInt(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("unlockPlanet: 잔량 부족 → InsufficientFuelException + consume 미호출")
+    void unlockPlanet_insufficientFuel() {
+        given(nodeRepository.findById("mercury"))
+                .willReturn(Optional.of(planet("mercury", 3, "earth", 1)));
+        given(userExplorationRepository.existsByUserIdAndNodeId(1L, "mercury")).willReturn(false);
+        given(nodeRepository.findByParentIdOrderBySortOrderAsc("earth"))
+                .willReturn(List.of(region("korea", "earth", 0, 0)));
+        given(userExplorationRepository.findByUserId(1L))
+                .willReturn(List.of(UserExploration.unlock(1L, "korea", true)));
+        given(fuelService.getFuel(1L)).willReturn(fuel(1));
+
+        assertThatThrownBy(() -> service.unlockPlanet(1L, "mercury"))
+                .isInstanceOf(InsufficientFuelException.class);
+        verify(fuelService, never()).consume(any(), anyInt(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("unlockPlanet: 이미 해금 → ALREADY_UNLOCKED")
+    void unlockPlanet_alreadyUnlocked() {
+        given(nodeRepository.findById("mercury"))
+                .willReturn(Optional.of(planet("mercury", 3, "earth", 1)));
+        given(userExplorationRepository.existsByUserIdAndNodeId(1L, "mercury")).willReturn(true);
+
+        assertThatThrownBy(() -> service.unlockPlanet(1L, "mercury"))
+                .isInstanceOf(CustomException.class);
+        verify(fuelService, never()).consume(any(), anyInt(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("unlockPlanet: 없는 행성 → PLANET_NOT_FOUND")
+    void unlockPlanet_notFound() {
+        given(nodeRepository.findById("nope")).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.unlockPlanet(1L, "nope"))
+                .isInstanceOf(CustomException.class);
+    }
 }

@@ -6,6 +6,7 @@ import com.elipair.spacestudyship.common.exception.InsufficientFuelException;
 import com.elipair.spacestudyship.study.exploration.constant.NodeType;
 import com.elipair.spacestudyship.study.exploration.dto.PlanetResponse;
 import com.elipair.spacestudyship.study.exploration.dto.RegionResponse;
+import com.elipair.spacestudyship.study.exploration.dto.PlanetUnlockResponse;
 import com.elipair.spacestudyship.study.exploration.dto.RegionUnlockResponse;
 import com.elipair.spacestudyship.study.exploration.entity.ExplorationNode;
 import com.elipair.spacestudyship.study.exploration.entity.UserExploration;
@@ -117,6 +118,37 @@ public class ExplorationService {
 
         return RegionUnlockResponse.of(region, saved,
                 fuelTx.amount(), fuelTx.balanceAfter(), planetCleared);
+    }
+
+    @Transactional
+    public PlanetUnlockResponse unlockPlanet(Long userId, String planetId) {
+        ExplorationNode planet = nodeRepository.findById(planetId)
+                .filter(n -> n.getNodeType() == NodeType.PLANET)
+                .orElseThrow(() -> new CustomException(ErrorCode.PLANET_NOT_FOUND));
+
+        if (planet.getRequiredFuel() == 0
+                || userExplorationRepository.existsByUserIdAndNodeId(userId, planetId)) {
+            throw new CustomException(ErrorCode.ALREADY_UNLOCKED);
+        }
+
+        if (planet.getPrerequisiteNodeId() != null
+                && !isPlanetCleared(userId, planet.getPrerequisiteNodeId())) {
+            throw new CustomException(ErrorCode.PREREQUISITE_NOT_CLEARED);
+        }
+
+        requireFuel(userId, planet.getRequiredFuel());
+
+        FuelTransactionResponse fuelTx = fuelService.consume(
+                userId, planet.getRequiredFuel(), FuelReason.EXPLORATION_UNLOCK,
+                planetId, UUID.randomUUID().toString());
+
+        UserExploration saved = userExplorationRepository.save(
+                UserExploration.unlock(userId, planetId, false));
+
+        log.info("[Exploration] 행성 해금 | userId={}, planetId={}, fuel={}",
+                userId, planetId, planet.getRequiredFuel());
+
+        return PlanetUnlockResponse.of(planet, saved, fuelTx.amount(), fuelTx.balanceAfter());
     }
 
     private void requireFuel(Long userId, int requiredFuel) {
