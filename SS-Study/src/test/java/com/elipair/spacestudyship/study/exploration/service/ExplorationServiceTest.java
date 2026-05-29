@@ -1,6 +1,7 @@
 package com.elipair.spacestudyship.study.exploration.service;
 
 import com.elipair.spacestudyship.common.exception.CustomException;
+import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.common.exception.InsufficientFuelException;
 import com.elipair.spacestudyship.study.exploration.constant.NodeType;
 import com.elipair.spacestudyship.study.exploration.dto.PlanetResponse;
@@ -86,7 +87,9 @@ class ExplorationServiceTest {
         given(nodeRepository.findById("nope")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.getRegions(1L, "nope"))
-                .isInstanceOf(CustomException.class);
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.PLANET_NOT_FOUND);
     }
 
     @Test
@@ -173,7 +176,9 @@ class ExplorationServiceTest {
         given(userExplorationRepository.existsByUserIdAndNodeId(1L, "mars")).willReturn(false);
 
         assertThatThrownBy(() -> service.unlockRegion(1L, "mars_olympus"))
-                .isInstanceOf(CustomException.class);
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.PLANET_LOCKED);
         verify(fuelService, never()).consume(any(), anyInt(), any(), any(), any());
     }
 
@@ -187,7 +192,9 @@ class ExplorationServiceTest {
         given(userExplorationRepository.existsByUserIdAndNodeId(1L, "japan")).willReturn(true);
 
         assertThatThrownBy(() -> service.unlockRegion(1L, "japan"))
-                .isInstanceOf(CustomException.class);
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.ALREADY_UNLOCKED);
         verify(fuelService, never()).consume(any(), anyInt(), any(), any(), any());
     }
 
@@ -197,7 +204,9 @@ class ExplorationServiceTest {
         given(nodeRepository.findById("nope")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.unlockRegion(1L, "nope"))
-                .isInstanceOf(CustomException.class);
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.REGION_NOT_FOUND);
     }
 
     @Test
@@ -236,7 +245,9 @@ class ExplorationServiceTest {
                 .willReturn(List.of(UserExploration.unlock(1L, "korea", true))); // 1/2만
 
         assertThatThrownBy(() -> service.unlockPlanet(1L, "mercury"))
-                .isInstanceOf(CustomException.class);
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.PREREQUISITE_NOT_CLEARED);
         verify(fuelService, never()).consume(any(), anyInt(), any(), any(), any());
     }
 
@@ -265,7 +276,9 @@ class ExplorationServiceTest {
         given(userExplorationRepository.existsByUserIdAndNodeId(1L, "mercury")).willReturn(true);
 
         assertThatThrownBy(() -> service.unlockPlanet(1L, "mercury"))
-                .isInstanceOf(CustomException.class);
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.ALREADY_UNLOCKED);
         verify(fuelService, never()).consume(any(), anyInt(), any(), any(), any());
     }
 
@@ -275,6 +288,8 @@ class ExplorationServiceTest {
         given(nodeRepository.findById("nope")).willReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.unlockPlanet(1L, "nope"))
-                .isInstanceOf(CustomException.class);
+                .isInstanceOf(CustomException.class)
+                .extracting(e -> ((CustomException) e).getErrorCode())
+                .isEqualTo(ErrorCode.PLANET_NOT_FOUND);
     }
 }
