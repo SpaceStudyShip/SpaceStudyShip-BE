@@ -41,6 +41,13 @@ public enum ErrorCode {
     SESSION_TOO_LONG(HttpStatus.BAD_REQUEST, "공부 시간은 24시간(1440분)을 초과할 수 없습니다."),
     FUTURE_SESSION(HttpStatus.BAD_REQUEST, "미래 시각의 세션은 저장할 수 없습니다."),
 
+    // Exploration
+    PLANET_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 행성을 찾을 수 없습니다."),
+    REGION_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 지역을 찾을 수 없습니다."),
+    ALREADY_UNLOCKED(HttpStatus.BAD_REQUEST, "이미 해금된 노드입니다."),
+    PLANET_LOCKED(HttpStatus.BAD_REQUEST, "상위 행성이 아직 해금되지 않았습니다."),
+    PREREQUISITE_NOT_CLEARED(HttpStatus.BAD_REQUEST, "이전 행성을 먼저 클리어해야 합니다."),
+
     // Common
     INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "입력값이 유효하지 않습니다."),
     INVALID_REQUEST_BODY(HttpStatus.BAD_REQUEST, "요청 본문의 형식이 잘못되었습니다."),

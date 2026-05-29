@@ -27,6 +27,16 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(errorCode));
     }
 
+    @ExceptionHandler(InsufficientFuelException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientFuel(InsufficientFuelException ex) {
+        log.info("[Exception] 연료 부족 | required={}, current={}", ex.getRequiredFuel(), ex.getCurrentFuel());
+        return ResponseEntity
+                .status(ErrorCode.INSUFFICIENT_FUEL.getHttpStatus())
+                .body(ErrorResponse.ofInsufficientFuel(
+                        ErrorCode.INSUFFICIENT_FUEL.getMessage(),
+                        ex.getRequiredFuel(), ex.getCurrentFuel()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex) {
         String detail = ex.getBindingResult().getFieldErrors().stream()
