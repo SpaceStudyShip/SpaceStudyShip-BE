@@ -215,10 +215,11 @@ class ExplorationServiceTest {
         given(nodeRepository.findById("mercury"))
                 .willReturn(Optional.of(planet("mercury", 3, "earth", 1)));
         given(userExplorationRepository.existsByUserIdAndNodeId(1L, "mercury")).willReturn(false);
+        // korea는 requiredFuel=0(암묵 해금) — 진행도 레코드가 없어도 earth는 클리어로 간주돼야 함
         given(nodeRepository.findByParentIdOrderBySortOrderAsc("earth"))
                 .willReturn(List.of(region("korea", "earth", 0, 0)));
         given(userExplorationRepository.findByUserId(1L))
-                .willReturn(List.of(UserExploration.unlock(1L, "korea", true)));
+                .willReturn(List.of());
         given(fuelService.getFuel(1L)).willReturn(fuel(100));
         given(fuelService.consume(eq(1L), eq(3), eq(FuelReason.EXPLORATION_UNLOCK), eq("mercury"), anyString()))
                 .willReturn(tx(3, 97));

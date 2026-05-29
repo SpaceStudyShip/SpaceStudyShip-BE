@@ -9,7 +9,7 @@
 **Tech Stack:** Java 21, Spring Boot 4, Spring Data JPA, Lombok, JUnit5+Mockito+AssertJ, Testcontainers(Postgres), Flyway, springdoc.
 
 **Spec:** `docs/superpowers/specs/2026-05-29-exploration-domain-design.md`
-**프론트 시드 원본:** `/Users/luca/workspace/Flutter_Project/space_study_ship/lib/features/exploration/data/seed/exploration_seed_data.dart`
+**프론트 시드 원본:** Flutter 레포 `lib/features/exploration/data/seed/exploration_seed_data.dart`
 
 **공통 규칙:**
 - 테스트: `./gradlew :SS-Study:test`, `./gradlew :SS-Web:test`, `./gradlew :SS-Common:test`. 단일: `--tests "FQCN"`.

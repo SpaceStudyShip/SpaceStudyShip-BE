@@ -47,7 +47,7 @@ public class ExplorationService {
         Map<String, Long> totalByParent = regions.stream()
                 .collect(Collectors.groupingBy(ExplorationNode::getParentId, Collectors.counting()));
         Map<String, Long> clearedByParent = regions.stream()
-                .filter(r -> unlocked.contains(r.getId()))
+                .filter(r -> r.getRequiredFuel() == 0 || unlocked.contains(r.getId()))
                 .collect(Collectors.groupingBy(ExplorationNode::getParentId, Collectors.counting()));
 
         return planets.stream().map(p -> {
@@ -165,6 +165,8 @@ public class ExplorationService {
         }
         Set<String> unlocked = userExplorationRepository.findByUserId(userId).stream()
                 .map(UserExploration::getNodeId).collect(Collectors.toSet());
-        return regions.stream().allMatch(r -> unlocked.contains(r.getId()));
+        // requiredFuel==0 지역은 암묵 해금(진행도 레코드 없음) — getRegions와 동일하게 클리어로 간주
+        return regions.stream()
+                .allMatch(r -> r.getRequiredFuel() == 0 || unlocked.contains(r.getId()));
     }
 }

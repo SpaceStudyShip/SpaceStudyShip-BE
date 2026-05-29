@@ -3,7 +3,7 @@
 > 작성일: 2026-05-29 (개정)
 > 대상 API 스펙: `docs/api-specs/05_exploration.md`
 > 프론트 계약: `docs/api-specs/exploration-frontend-requirements.md`
-> 프론트 시드 원본: `/Users/luca/workspace/Flutter_Project/space_study_ship/lib/features/exploration/data/seed/exploration_seed_data.dart`
+> 프론트 시드 원본: Flutter 레포 `lib/features/exploration/data/seed/exploration_seed_data.dart`
 > 동기화 Tier: 2 (Server-Validated)
 
 ---
