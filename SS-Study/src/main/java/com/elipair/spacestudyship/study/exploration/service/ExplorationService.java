@@ -2,13 +2,17 @@ package com.elipair.spacestudyship.study.exploration.service;
 
 import com.elipair.spacestudyship.common.exception.CustomException;
 import com.elipair.spacestudyship.common.exception.ErrorCode;
+import com.elipair.spacestudyship.common.exception.InsufficientFuelException;
 import com.elipair.spacestudyship.study.exploration.constant.NodeType;
 import com.elipair.spacestudyship.study.exploration.dto.PlanetResponse;
 import com.elipair.spacestudyship.study.exploration.dto.RegionResponse;
+import com.elipair.spacestudyship.study.exploration.dto.RegionUnlockResponse;
 import com.elipair.spacestudyship.study.exploration.entity.ExplorationNode;
 import com.elipair.spacestudyship.study.exploration.entity.UserExploration;
 import com.elipair.spacestudyship.study.exploration.repository.ExplorationNodeRepository;
 import com.elipair.spacestudyship.study.exploration.repository.UserExplorationRepository;
+import com.elipair.spacestudyship.study.fuel.constant.FuelReason;
+import com.elipair.spacestudyship.study.fuel.dto.FuelTransactionResponse;
 import com.elipair.spacestudyship.study.fuel.service.FuelService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -75,6 +80,50 @@ public class ExplorationService {
     private Map<String, UserExploration> progressMap(Long userId) {
         return userExplorationRepository.findByUserId(userId).stream()
                 .collect(Collectors.toMap(UserExploration::getNodeId, Function.identity()));
+    }
+
+    @Transactional
+    public RegionUnlockResponse unlockRegion(Long userId, String regionId) {
+        ExplorationNode region = nodeRepository.findById(regionId)
+                .filter(n -> n.getNodeType() == NodeType.REGION)
+                .orElseThrow(() -> new CustomException(ErrorCode.REGION_NOT_FOUND));
+
+        ExplorationNode parent = nodeRepository.findById(region.getParentId())
+                .orElseThrow(() -> new CustomException(ErrorCode.PLANET_NOT_FOUND));
+        boolean parentUnlocked = parent.getRequiredFuel() == 0
+                || userExplorationRepository.existsByUserIdAndNodeId(userId, parent.getId());
+        if (!parentUnlocked) {
+            throw new CustomException(ErrorCode.PLANET_LOCKED);
+        }
+
+        if (region.getRequiredFuel() == 0
+                || userExplorationRepository.existsByUserIdAndNodeId(userId, regionId)) {
+            throw new CustomException(ErrorCode.ALREADY_UNLOCKED);
+        }
+
+        requireFuel(userId, region.getRequiredFuel());
+
+        FuelTransactionResponse fuelTx = fuelService.consume(
+                userId, region.getRequiredFuel(), FuelReason.EXPLORATION_UNLOCK,
+                regionId, UUID.randomUUID().toString());
+
+        UserExploration saved = userExplorationRepository.save(
+                UserExploration.unlock(userId, regionId, true));
+
+        boolean planetCleared = isPlanetCleared(userId, parent.getId());
+
+        log.info("[Exploration] 지역 해금 | userId={}, regionId={}, fuel={}, planetCleared={}",
+                userId, regionId, region.getRequiredFuel(), planetCleared);
+
+        return RegionUnlockResponse.of(region, saved,
+                fuelTx.amount(), fuelTx.balanceAfter(), planetCleared);
+    }
+
+    private void requireFuel(Long userId, int requiredFuel) {
+        int currentFuel = fuelService.getFuel(userId).currentFuel();
+        if (currentFuel < requiredFuel) {
+            throw new InsufficientFuelException(requiredFuel, currentFuel);
+        }
     }
 
     private boolean isPlanetCleared(Long userId, String planetId) {
