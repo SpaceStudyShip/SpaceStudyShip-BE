@@ -35,7 +35,7 @@ out/
 
 ### VS Code ###
 .vscode/
-
+.DS_Store
 *.properties
 !gradle/wrapper/gradle-wrapper.properties
 
@@ -46,3 +46,12 @@ application-local.yml
 
 ### Claude Config (PAT 포함 민감 정보) ###
 .claude/config.json
+.report/
+.pr/
+
+### Firebase Admin SDK (민감 정보) ###
+**/firebase/*.json
+*-firebase-adminsdk-*.json
+
+### 이슈/PR 로컬 템플릿 산출물 ###
+docs/suh-template/

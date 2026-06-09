@@ -40,7 +40,7 @@
   "currentFuel": 350,
   "totalCharged": 1200,
   "totalConsumed": 850,
-  "pendingMinutes": 0,
+  "pendingMinutes": 15,
   "lastUpdatedAt": "2026-04-16T10:30:00Z"
 }
 ```
@@ -50,7 +50,7 @@
 | `currentFuel` | Integer | 현재 보유 연료 (`totalCharged - totalConsumed`) |
 | `totalCharged` | Integer | 누적 충전량 |
 | `totalConsumed` | Integer | 누적 소비량 |
-| `pendingMinutes` | Integer | 아직 서버에 동기화되지 않은 공부 시간 (분). 현재 사용 안 함, 향후 확장용 |
+| `pendingMinutes` | Integer | 다음 1연료까지 남은 누적 공부 분 (0~29). 30분 미만 잔여분이 다음 세션과 합산되어 이월됨 |
 | `lastUpdatedAt` | String | 마지막 연료 변동 시각 (ISO 8601 UTC) |
 
 ---
@@ -200,7 +200,7 @@ GET /api/fuel/transactions?type=consume&startDate=2026-04-01&endDate=2026-04-16
 | `total_charged` | INTEGER | 누적 충전량 |
 | `total_consumed` | INTEGER | 누적 소비량 |
 | `pending_minutes` | INTEGER | 미동기화 시간 |
-| `last_updated_at` | TIMESTAMP | 마지막 변동 시각 |
+| `updated_at` | TIMESTAMP | 마지막 변동 시각 (BaseTimeEntity.updatedAt) |
 
 ### fuel_transactions
 

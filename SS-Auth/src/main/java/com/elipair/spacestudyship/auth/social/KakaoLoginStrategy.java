@@ -1,19 +1,29 @@
 package com.elipair.spacestudyship.auth.social;
 
+import com.elipair.spacestudyship.common.exception.CustomException;
+import com.elipair.spacestudyship.common.exception.ErrorCode;
 import com.elipair.spacestudyship.member.constant.SocialType;
+import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseAuthException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.ThreadLocalRandom;
-
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class KakaoLoginStrategy implements SocialLoginStrategy {
+
+    private final FirebaseAuth firebaseAuth;
 
     @Override
     public String validateAndGetSocialId(String socialIdToken) {
-        // TODO: 카카오 로그인 연동 구현
-        // 클라이언트에서 받은 idToken으로 카카오 리소스 서버로부터 socialId를 가져온다.
-        ThreadLocalRandom random = ThreadLocalRandom.current();
-        return "KAKAO_SOCIAL_ID_" + random.nextInt(100_000);
+        try {
+            return firebaseAuth.verifyIdToken(socialIdToken).getUid();
+        } catch (FirebaseAuthException e) {
+            log.warn("[KakaoLogin] Firebase 토큰 검증 실패 | reason={}", e.getMessage());
+            throw new CustomException(ErrorCode.INVALID_TOKEN);
+        }
     }
 
     @Override

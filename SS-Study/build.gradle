@@ -10,4 +10,10 @@ jar {
 dependencies {
 	api project(':SS-Common')
 	api project(':SS-Member')
+
+	// Test - Testcontainers PostgreSQL (JSONB 쿼리 검증용)
+	testImplementation 'org.testcontainers:testcontainers:1.20.4'
+	testImplementation 'org.testcontainers:postgresql:1.20.4'
+	testImplementation 'org.testcontainers:junit-jupiter:1.20.4'
+	testRuntimeOnly 'org.postgresql:postgresql'
 }

@@ -1,7 +1,9 @@
 package com.elipair.spacestudyship.common.exception;
 
+import java.time.format.DateTimeParseException;
 import java.util.stream.Collectors;
 
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -25,6 +27,16 @@ public class GlobalExceptionHandler {
                 .body(ErrorResponse.of(errorCode));
     }
 
+    @ExceptionHandler(InsufficientFuelException.class)
+    public ResponseEntity<ErrorResponse> handleInsufficientFuel(InsufficientFuelException ex) {
+        log.info("[Exception] 연료 부족 | required={}, current={}", ex.getRequiredFuel(), ex.getCurrentFuel());
+        return ResponseEntity
+                .status(ErrorCode.INSUFFICIENT_FUEL.getHttpStatus())
+                .body(ErrorResponse.ofInsufficientFuel(
+                        ErrorCode.INSUFFICIENT_FUEL.getMessage(),
+                        ex.getRequiredFuel(), ex.getCurrentFuel()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException ex) {
         String detail = ex.getBindingResult().getFieldErrors().stream()
@@ -34,7 +46,28 @@ public class GlobalExceptionHandler {
         ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
         return ResponseEntity
                 .status(errorCode.getHttpStatus())
-                .body(ErrorResponse.of(errorCode.getHttpStatus().value(), detail));
+                .body(ErrorResponse.of(errorCode, detail));
+    }
+
+    @ExceptionHandler(DateTimeParseException.class)
+    public ResponseEntity<ErrorResponse> handleDateTimeParse(DateTimeParseException ex) {
+        log.info("[Validation] 날짜 형식 오류 | error={}", ex.getMessage());
+        ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(ErrorResponse.of(errorCode, "날짜 형식이 올바르지 않습니다. YYYY-MM-DD 형식이어야 합니다."));
+    }
+
+    @ExceptionHandler(ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolation(ConstraintViolationException ex) {
+        String detail = ex.getConstraintViolations().stream()
+                .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+                .collect(Collectors.joining(", "));
+        log.info("[Validation] 파라미터 검증 실패 | detail={}", detail);
+        ErrorCode errorCode = ErrorCode.INVALID_INPUT_VALUE;
+        return ResponseEntity
+                .status(errorCode.getHttpStatus())
+                .body(ErrorResponse.of(errorCode, detail));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

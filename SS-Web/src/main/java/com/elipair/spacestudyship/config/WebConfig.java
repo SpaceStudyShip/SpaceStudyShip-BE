@@ -22,7 +22,9 @@ public class WebConfig implements WebMvcConfigurer {
         registry.addInterceptor(authInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(
-                        "/api/auth/**",  // AuthController - 인증 불필요 (login, reissue, logout)
+                        "/api/auth/login",
+                        "/api/auth/reissue",
+                        "/api/auth/logout",
                         "/actuator/health"
                 );
     }
